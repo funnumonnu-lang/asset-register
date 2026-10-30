@@ -1,0 +1,1171 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>ファシリティ物品台帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>*,*::before,*::after{box-sizing:border-box}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>
+/* Layout: 作業台型。上部に拠点・タブ・状態サマリー、下に図面（左サイド＋キャンバス）／一覧／拠点・部屋／取込・出力。スマホは下部ナビ。 */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --sunk:#e4e8ed; --ink:#18212c; --muted:#5b6674; --line:#d3d9e0;
+  --accent:#24539c; --accent-ink:#ffffff; --tag:#f2d24b; --tag-ink:#1c1a10; --grid:rgba(36,83,156,.07);
+  --danger:#b8402a;
+  --st-use:#2c8553; --st-store:#5f6b7a; --st-pmove:#b98110; --st-moved:#2d68c4; --st-pdisp:#cc5527; --st-disp:#8d9198; --st-check:#8648c4;
+  --f-head:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --f-body:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  --f-code:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10151b; --panel:#171e26; --sunk:#0c1015; --ink:#e4e9ef; --muted:#97a3b0; --line:#2a3440;
+  --accent:#7ea6ea; --accent-ink:#0d1622; --tag:#e3c443; --tag-ink:#1c1a10; --grid:rgba(126,166,234,.06);
+  --danger:#ef8a72;
+  --st-use:#4fb57c; --st-store:#8e99a7; --st-pmove:#e0a93a; --st-moved:#6d9cef; --st-pdisp:#ee7d4f; --st-disp:#7a7f87; --st-check:#b07ee8;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151b; --panel:#171e26; --sunk:#0c1015; --ink:#e4e9ef; --muted:#97a3b0; --line:#2a3440;
+  --accent:#7ea6ea; --accent-ink:#0d1622; --tag:#e3c443; --tag-ink:#1c1a10; --grid:rgba(126,166,234,.06);
+  --danger:#ef8a72;
+  --st-use:#4fb57c; --st-store:#8e99a7; --st-pmove:#e0a93a; --st-moved:#6d9cef; --st-pdisp:#ee7d4f; --st-disp:#7a7f87; --st-check:#b07ee8;
+  color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.55;display:flex;flex-direction:column;overflow:hidden}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.code{font-family:var(--f-code);font-weight:500;font-size:12px;background:var(--tag);color:var(--tag-ink);padding:1px 6px;border-radius:3px;letter-spacing:.02em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 12px;line-height:1.3;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 40%,var(--line))}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+input[type=text],input[type=number],input[type=search],select,textarea{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:6px 8px;min-width:0}
+textarea{resize:vertical}
+label.f{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+label.f > :is(input,select,textarea){font-size:14px;color:var(--ink)}
+
+/* top */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{font-family:var(--f-head);font-weight:700;font-size:16px;letter-spacing:.04em;display:flex;align-items:baseline;gap:8px}
+.brand small{font-family:var(--f-code);font-size:10px;color:var(--muted);letter-spacing:.12em;font-weight:500}
+.tabs{display:flex;gap:2px;background:var(--sunk);border-radius:7px;padding:3px}
+.tabs button{border:0;background:transparent;padding:5px 12px;border-radius:5px;color:var(--muted)}
+.tabs button[aria-selected=true]{background:var(--panel);color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.top .grow{flex:1}
+#siteSel{max-width:260px;font-weight:700}
+
+.summary{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--bg)}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:2px 10px 2px 8px;background:var(--panel);font-size:12px}
+.chip .dot{width:9px;height:9px;border-radius:50%}
+.chip b{font-variant-numeric:tabular-nums}
+.chip[aria-pressed=false]{opacity:.45;background:transparent}
+.summary .total{font-size:12px;color:var(--muted);margin-right:6px}
+.summary .total b{color:var(--ink);font-size:15px;font-variant-numeric:tabular-nums}
+
+.banner{background:color-mix(in srgb,var(--st-pmove) 18%,var(--panel));border-bottom:1px solid var(--line);padding-block:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+main{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;overflow:auto}
+.view[hidden]{display:none!important}
+
+/* plan */
+#v-plan{display:grid;grid-template-columns:300px minmax(0,1fr);overflow:hidden}
+.side{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.side .blk{padding:12px 14px;border-bottom:1px solid var(--line);display:grid;gap:8px}
+.side h3{margin:0;font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.unplaced{flex:1;overflow:auto;padding:6px 8px 14px}
+.up{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;padding:7px 8px;border-radius:6px;cursor:grab;border:1px solid transparent;align-items:center}
+.up:hover{background:var(--sunk)}
+.up.armed{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--panel))}
+.up .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.up .sub{grid-column:2;font-size:11px;color:var(--muted)}
+.stage{position:relative;overflow:hidden;background-color:var(--sunk);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;touch-action:none;user-select:none;-webkit-user-select:none}
+.stage.pick{cursor:crosshair}
+.plane{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;--inv:1}
+.plane img{display:block;max-width:none;background:#fff;box-shadow:0 2px 16px rgba(0,0,0,.18);pointer-events:none}
+.mk{position:absolute;width:0;height:0}
+.mk i{position:absolute;left:0;top:0;width:15px;height:15px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);transform:translate(-50%,-50%) scale(var(--inv));cursor:pointer}
+.mk.sel i{box-shadow:0 0 0 3px var(--accent),0 0 0 5px #fff}
+.mk span{position:absolute;left:0;top:0;transform:scale(var(--inv)) translate(10px,-50%);transform-origin:0 0;font-family:var(--f-code);font-size:10px;background:rgba(255,255,255,.92);color:#1a1f26;padding:0 3px;border-radius:2px;white-space:nowrap;pointer-events:none;display:none}
+.plane.labels .mk span{display:block}
+.edit .mk i{cursor:move}
+.rm{position:absolute;width:0;height:0}
+.rm b{position:absolute;transform:scale(var(--inv)) translate(-50%,-50%);transform-origin:0 0;font-size:11px;font-weight:700;color:var(--accent);background:color-mix(in srgb,var(--panel) 88%,transparent);border:1px dashed var(--accent);border-radius:4px;padding:1px 6px;white-space:nowrap;pointer-events:none}
+.stagebar{position:absolute;right:calc(12px + env(safe-area-inset-right,0px));top:12px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;z-index:2}
+.stagebar .btn{box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.btn.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.empty{display:grid;place-items:center;text-align:center;height:100%;padding:24px;color:var(--muted)}
+.empty div{max-width:420px;display:grid;gap:10px;justify-items:center}
+.empty strong{color:var(--ink);font-size:16px}
+
+/* list */
+.wrap{padding-block:16px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px;align-content:start}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar input[type=search]{flex:1;min-width:180px}
+.rows{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.row{display:grid;grid-template-columns:28px 112px minmax(0,2fr) minmax(0,1fr) 54px 92px minmax(0,1fr) minmax(0,1fr) 84px;gap:10px;align-items:center;padding:8px 12px;border-top:1px solid var(--line);cursor:pointer}
+.row:first-child{border-top:0}
+.row.head{background:var(--sunk);font-size:11px;color:var(--muted);letter-spacing:.06em;cursor:default;font-weight:700}
+.row:not(.head):hover{background:color-mix(in srgb,var(--accent) 5%,var(--panel))}
+.row > *{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row.gone .nm{text-decoration:line-through;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--c)}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;font-size:12px;color:var(--muted)}
+
+/* sites */
+.sitegrid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:16px;align-items:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:grid;gap:10px;min-width:0}
+.card h2{margin:0;font-family:var(--f-head);font-size:15px;text-wrap:balance}
+.card h4{margin:4px 0 0;font-size:11px;letter-spacing:.08em;color:var(--muted)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font-size:11px;color:var(--muted);text-align:left;font-weight:700;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl td.r,.tbl th.r{text-align:right;font-variant-numeric:tabular-nums}
+.tbl input,.tbl select{width:100%;padding:3px 6px}
+.scroll{overflow-x:auto}
+.cnt{display:inline-flex;gap:4px;flex-wrap:wrap}
+.cnt span{font-size:11px;padding:0 5px;border-radius:3px;background:color-mix(in srgb,var(--c) 16%,transparent);color:var(--c);font-weight:700;font-variant-numeric:tabular-nums}
+
+/* io */
+.iogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card p{margin:0;color:var(--muted);font-size:13px}
+.card .acts{display:flex;gap:8px;flex-wrap:wrap}
+.cols{font-family:var(--f-code);font-size:11px;color:var(--muted);line-height:1.7}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,15,22,.35);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--panel);z-index:21;display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(0,0,0,.18);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.dh{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.dh h2{margin:0;font-size:15px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.db{flex:1;overflow:auto;padding:14px 16px 20px;display:grid;gap:12px;align-content:start}
+.df{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.df .grow{flex:1}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.photo{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center}
+.photo .ph{width:96px;height:96px;border-radius:6px;background:var(--sunk);display:grid;place-items:center;overflow:hidden;color:var(--muted);font-size:11px;border:1px solid var(--line)}
+.photo img{width:100%;height:100%;object-fit:cover}
+.stseg{display:flex;flex-wrap:wrap;gap:5px}
+.stseg button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;font-size:12px;display:inline-flex;gap:5px;align-items:center}
+.stseg button::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
+.stseg button[aria-pressed=true]{border-color:var(--c);background:color-mix(in srgb,var(--c) 15%,var(--panel));font-weight:700}
+.posbox{border:1px dashed var(--line);border-radius:6px;padding:8px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.hist{border-top:1px solid var(--line);padding-top:10px;display:grid;gap:6px}
+.hist ol{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.hist li{font-size:12px;display:grid;grid-template-columns:auto 1fr;gap:2px 10px}
+.hist time{color:var(--muted);font-variant-numeric:tabular-nums}
+.hist .who{grid-column:2;color:var(--muted);font-size:11px}
+.qrbox{display:flex;gap:12px;align-items:center}
+.qrbox svg{width:88px;height:88px;background:#fff;padding:4px;border-radius:4px}
+details.adv summary{cursor:pointer;color:var(--muted);font-size:12px}
+details.adv > div{display:grid;gap:8px;padding-top:8px}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:rgba(10,15,22,.45);padding:16px}
+.mbox{background:var(--panel);border-radius:10px;width:min(560px,100%);max-height:90vh;overflow:auto;padding:18px 20px;display:grid;gap:12px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.mbox h3{margin:0;font-size:16px}
+.mbox .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.prog{height:6px;background:var(--sunk);border-radius:3px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+.mini{font-size:12px;max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:6px}
+.mini table{border-collapse:collapse;width:100%}
+.mini td,.mini th{padding:3px 6px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:left}
+.err{color:var(--danger)}
+
+.toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:6px;font-size:13px;z-index:40;max-width:calc(100% - 32px)}
+.copy{position:fixed;right:calc(10px + env(safe-area-inset-right,0px));bottom:calc(6px + env(safe-area-inset-bottom,0px));font-size:10px;color:var(--muted);z-index:4;pointer-events:none;background:color-mix(in srgb,var(--bg) 80%,transparent);padding:1px 6px;border-radius:3px}
+
+.bnav{display:none}
+@media (max-width:820px){
+  .tabs,#btnNew,#btnScanTop{display:none}
+  .side p.hint{display:none}
+  .brand{font-size:14px}
+  .top{gap:8px}
+  .brand small{display:none}
+  #siteSel{flex:1;max-width:none}
+  #v-plan{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .side{border-right:0;border-bottom:1px solid var(--line);max-height:38vh}
+  .side .unplaced{max-height:20vh}
+  .sitegrid{grid-template-columns:1fr}
+  .row{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"code nm st" "code sub sub";row-gap:2px}
+  .row.head{display:none}
+  .row > .c-chk,.row > .c-cat,.row > .c-qty,.row > .c-fl,.row > .c-upd{display:none}
+  .row > .c-code{grid-area:code} .row > .c-nm{grid-area:nm} .row > .c-st{grid-area:st} .row > .c-rm{grid-area:sub;font-size:12px;color:var(--muted)}
+  .bnav{display:grid;grid-template-columns:repeat(5,1fr);background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);z-index:6}
+  .bnav button{border:0;background:transparent;padding:8px 2px 7px;font-size:11px;display:grid;justify-items:center;gap:2px;color:var(--muted)}
+  .bnav button svg{width:22px;height:22px}
+  .bnav button[aria-selected=true]{color:var(--accent);font-weight:700}
+  .bnav .reg{color:var(--accent);font-weight:700}
+  .copy{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+  .g2{grid-template-columns:1fr 1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.hint{margin:0;font-size:12px}
+h3.lbl{margin:0;font-size:12px;color:var(--muted);letter-spacing:.08em}
+h2.ttl{margin:0;font-size:18px;font-family:var(--f-head)}
+.who{max-width:220px;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.auth{position:fixed;inset:0;z-index:60;background:var(--bg);display:grid;place-items:center;overflow:auto;padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.auth .card{width:min(440px,100%);padding:22px 24px;gap:14px}
+.auth .brand{font-size:18px}
+.auth .acts{display:flex;gap:8px;justify-content:flex-start}
+.copyline{font-size:10px!important;color:var(--muted);margin:4px 0 0!important}
+.scan{position:relative}
+.scan video{width:100%;max-height:60vh;border-radius:8px;background:#000;display:block;object-fit:cover;aspect-ratio:3/4}
+.scan .frame{position:absolute;inset:18% 15%;border:3px solid var(--tag);border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.25);pointer-events:none}
+@media (max-width:820px){.who{display:none}}
+</style>
+
+</head>
+<body>
+<div class="auth" id="auth" hidden></div>
+
+<header class="top">
+  <div class="brand">ファシリティ物品台帳<small>ASSET REGISTER</small></div>
+  <select id="siteSel" aria-label="拠点"></select>
+  <nav class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-v="plan" aria-selected="true">図面</button>
+    <button role="tab" data-v="list" aria-selected="false">一覧</button>
+    <button role="tab" data-v="sites" aria-selected="false">拠点・部屋</button>
+    <button role="tab" data-v="io" aria-selected="false">取込・出力</button>
+  </nav>
+  <div class="grow"></div>
+  <button class="btn" id="btnScanTop">QR読取</button>
+  <button class="btn primary" id="btnNew">＋ 物品を登録</button>
+  <button class="btn sm who" id="btnMe" title="ログアウト"></button>
+</header>
+<div class="banner" id="banner" hidden></div>
+<section class="summary" id="summary"></section>
+
+<main>
+  <section class="view" id="v-plan">
+    <aside class="side">
+      <div class="blk">
+        <h3>フロア図面 <button class="btn sm" id="btnAddFloor">＋ 図面を追加</button></h3>
+        <select id="floorSel" aria-label="フロア"></select>
+      </div>
+      <div class="blk">
+        <h3>未配置の物品 <span class="muted num" id="upCount"></span></h3>
+        <input type="search" id="upQ" placeholder="ID・品名で絞り込み">
+        <p class="muted hint">図面へドラッグするか、選んでから図面をクリックして配置。配置すると次の物品が自動で選ばれます。</p>
+      </div>
+      <div class="unplaced" id="unplaced"></div>
+    </aside>
+    <div class="stage" id="stage">
+      <div class="plane" id="plane"><img id="planImg" alt=""><div id="rlayer"></div><div id="layer"></div></div>
+      <div class="empty" id="planEmpty" hidden></div>
+      <div class="stagebar">
+        <button class="btn sm" id="btnEdit" aria-pressed="false">位置を編集</button>
+        <button class="btn sm" id="btnLabels" aria-pressed="false">ID表示</button>
+        <button class="btn sm" id="btnFit">全体</button>
+        <button class="btn sm" id="btnZin" aria-label="拡大">＋</button>
+        <button class="btn sm" id="btnZout" aria-label="縮小">－</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-list" hidden>
+    <div class="wrap">
+      <div class="toolbar">
+        <input type="search" id="lq" placeholder="ID・品名・メーカー・備考で検索">
+        <select id="lfFloor" aria-label="フロアで絞り込み"></select>
+        <select id="lfRoom" aria-label="部屋で絞り込み"></select>
+        <select id="lfCat" aria-label="種別で絞り込み"></select>
+      </div>
+      <div class="toolbar" id="bulkBar" hidden>
+        <span><b class="num" id="bulkN">0</b>件を選択中</span>
+        <select id="bulkSt" aria-label="変更後の状態"></select>
+        <input type="text" id="bulkNote" placeholder="メモ（任意）" style="flex:1;min-width:140px">
+        <button class="btn primary sm" id="bulkApply">状態を変更</button>
+        <button class="btn sm" id="bulkQr">QRラベル</button>
+        <button class="btn sm" id="bulkClear">選択解除</button>
+      </div>
+      <div class="rows" id="rows"></div>
+      <div class="pager" id="pager"></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-sites" hidden><div class="wrap" id="sitesWrap"></div></section>
+  <section class="view" id="v-io" hidden><div class="wrap" id="ioWrap"></div></section>
+</main>
+
+<nav class="bnav" id="bnav">
+  <button data-m="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 8h3v3H8zM13 13h3v3h-3zM13 8h3M8 16h3"/></svg>QR読取</button>
+  <button data-m="new" class="reg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>登録</button>
+  <button data-v="list" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>一覧</button>
+  <button data-v="plan" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 4h18v16H3zM3 11h8M11 4v16M15 14h6"/></svg>図面</button>
+  <button data-v="sites" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V8l8-4 8 4v12M9 20v-6h6v6"/></svg>拠点</button>
+</nav>
+
+<input type="file" id="fScan" accept="image/*" capture="environment" hidden>
+<input type="file" id="fPhoto" accept="image/*" capture="environment" hidden>
+<input type="file" id="fDraw" accept=".pdf,.dxf,.dwg,.png,.jpg,.jpeg,.webp,.gif,image/*,application/pdf" hidden>
+<input type="file" id="fXlsx" accept=".xlsx,.xls,.xlsm,.csv" hidden>
+<input type="file" id="fFac" accept=".xlsx,.xls,.xlsm" hidden>
+
+<div id="drawerHost"></div>
+<div id="modalHost"></div>
+<div class="toast" id="toast" hidden></div>
+<div class="copy">© 合同会社mokume　無断複製・再配布禁止</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   ファシリティ物品台帳（GitHub Pages ＋ Supabase 版）
+   ▼ SupabaseのURLと anon public key をここに貼り付けてください
+     （ダッシュボード → Project Settings → API）。空欄の場合は初回に入力画面が出ます。
+   ===================================================================== */
+const SUPABASE_URL = '';
+const SUPABASE_ANON_KEY = '';
+/* ===================================================================== */
+
+const COPY='© 合同会社mokume　無断複製・再配布禁止';
+const BUCKET='fa';
+const STATUSES=[
+ {k:'使用中',v:'--st-use'},{k:'保管中',v:'--st-store'},{k:'転用予定',v:'--st-pmove'},{k:'転用済',v:'--st-moved'},
+ {k:'廃棄予定',v:'--st-pdisp'},{k:'廃棄済',v:'--st-disp'},{k:'要確認',v:'--st-check'}];
+const ST_COLOR=Object.fromEntries(STATUSES.map(s=>[s.k,`var(${s.v})`]));
+const GONE=new Set(['転用済','廃棄済']);
+const CATS=['執務デスク','執務チェア','会議テーブル','会議チェア','ソファ・ラウンジ家具','収納・キャビネット','ロッカー','書庫','パーティション','ホワイトボード','モニター','複合機・プリンター','家電','IT機器','その他'];
+const AREA_COLS=['執務面積（壁芯）','執務面積（内法）','生活支援面積（壁芯）','会議室・応接室面積','管理諸室面積','他社面積','役員室面積','倉庫・金庫室面積','ロビー面積','その他個室等面積'];
+const ROLES={viewer:'閲覧のみ',editor:'編集',admin:'管理者'};
+const LIBS={
+ xlsx:['https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'],
+ pdf:['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'],
+ dxf:['https://cdn.jsdelivr.net/npm/dxf-parser@1.1.2/dist/dxf-parser.js'],
+ jsqr:['https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'],
+ qr:['https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js']};
+const PDF_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const tms=t=>t?Date.parse(t)||0:0;
+const pad2=n=>String(n).padStart(2,'0');
+const fmtD=t=>{if(!t)return'';const d=new Date(t);return `${d.getFullYear()}/${pad2(d.getMonth()+1)}/${pad2(d.getDate())}`};
+const fmtDT=t=>{if(!t)return'';const d=new Date(t);return fmtD(t)+' '+pad2(d.getHours())+':'+pad2(d.getMinutes())};
+const num=v=>{if(v===null||v===undefined||v==='')return null;const n=typeof v==='number'?v:parseFloat(String(v).replace(/[,，]/g,''));return isFinite(n)?n:null};
+const clean=o=>{const r={};for(const k in o){if(o[k]!==undefined)r[k]=o[k]}return r};
+const safeId=s=>String(s).trim().replace(/[\/\s#?%]/g,'_').slice(0,120);
+const isNarrow=()=>matchMedia('(max-width:820px)').matches;
+const nowIso=()=>new Date().toISOString();
+const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lsSet=(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}};
+const ITEM_COLS=['code','site_code','name','category','maker','model','qty','status','dest','floor_id','room_id','x','y','photo_path','note','history','deleted','created_at','updated_at','updated_by_email'];
+const pick=(o,cols)=>{const r={};cols.forEach(k=>{if(o[k]!==undefined)r[k]=o[k]});return r};
+
+let sb=null;
+const S={email:null,role:null,canWrite:false,
+  sites:{},site:null,floors:{},rooms:{},items:new Map(),
+  view:'plan',floorId:'',showSt:new Set(STATUSES.map(s=>s.k).filter(k=>!GONE.has(k))),
+  edit:false,labels:false,arm:null,pick:null,sel:null,dirty:false,drawerCode:null,
+  list:{page:0,q:'',floor:'',room:'',cat:'',checked:new Set()},loadingItems:false,urls:{}};
+
+/* ---------- utilities ---------- */
+const loaded={};
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('ライブラリを読み込めませんでした。通信状態を確認してください。'));document.head.appendChild(s)})}
+function need(name){return loaded[name]||(loaded[name]=(async()=>{for(const u of LIBS[name])await loadScript(u)})().catch(e=>{delete loaded[name];throw e}))}
+let toastT;function toast(msg,ms=2600){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,ms)}
+function errMsg(e){
+  const m=(e&&(e.message||e.error_description||e.msg))||'';
+  if(/row-level security|permission denied|権限/i.test(m))return 'この操作の権限がありません。管理者に権限を確認してください。';
+  if(/JWT|session|not authenticated/i.test(m))return 'ログインの有効期限が切れました。ページを再読み込みしてログインし直してください。';
+  if(/Payload too large|exceeded the maximum/i.test(m))return 'ファイルが大きすぎます。';
+  if(/Failed to fetch|NetworkError/i.test(m))return '通信できませんでした。電波の良い場所で再度お試しください。';
+  if(/duplicate key/i.test(m))return '同じIDがすでに登録されています。';
+  return m||'処理に失敗しました。';
+}
+function chk(r){if(r&&r.error)throw r.error;return r?r.data:null}
+async function withRetry(fn){for(let i=0;i<4;i++){try{return await fn()}catch(e){if(/Failed to fetch|NetworkError|timeout|503|502/i.test((e&&e.message)||'')&&i<3){await sleep(600*2**i);continue}throw e}}}
+const chunks=(a,n)=>{const o=[];for(let i=0;i<a.length;i+=n)o.push(a.slice(i,i+n));return o};
+
+function modal(html,{wide=false}={}){
+  const host=$('modalHost');host.innerHTML=`<div class="modal" role="dialog" aria-modal="true"><div class="mbox" style="${wide?'width:min(760px,100%)':''}">${html}</div></div>`;
+  return host.firstChild.firstChild;
+}
+function closeModal(){stopCamera();$('modalHost').innerHTML=''}
+function ask(title,body,ok='実行',danger=false){
+  return new Promise(res=>{const b=modal(`<h3>${esc(title)}</h3><div>${body}</div><div class="acts"><button class="btn" data-a="no">キャンセル</button><button class="btn ${danger?'danger':'primary'}" data-a="ok">${esc(ok)}</button></div>`);
+    b.onclick=e=>{const a=e.target.dataset.a;if(!a)return;closeModal();res(a==='ok')}})
+}
+function banner(msg,actions=''){const b=$('banner');b.hidden=!msg;b.innerHTML=msg?`<span>${esc(msg)}</span>${actions}`:''}
+const liveItems=()=>[...S.items.values()].filter(it=>!it.deleted);
+const baseUrl=()=>location.origin+location.pathname;
+
+/* ---------- storage ---------- */
+async function fileUrl(path){
+  if(!path)return null;const c=S.urls[path];if(c&&c.exp>Date.now())return c.url;
+  const {data,error}=await sb.storage.from(BUCKET).createSignedUrl(path,6*3600);if(error)return null;
+  S.urls[path]={url:data.signedUrl,exp:Date.now()+5.5*3600e3};return data.signedUrl;
+}
+async function uploadFile(path,blob){chk(await withRetry(()=>sb.storage.from(BUCKET).upload(path,blob,{contentType:blob.type||'application/octet-stream',upsert:true})));return path}
+
+/* ---------- setup & auth ---------- */
+function cfg(){const url=SUPABASE_URL||lsGet('fa.sbUrl')||'',key=SUPABASE_ANON_KEY||lsGet('fa.sbKey')||'';return {url:url.trim(),key:key.trim()}}
+function showSetup(msg){
+  const a=$('auth');a.hidden=false;
+  a.innerHTML=`<form class="card" id="setupF"><h2>接続先の設定</h2><p>SupabaseのProject URLと anon public key を入力してください（ダッシュボード → Project Settings → API）。この端末にだけ保存されます。全員に配る場合は、HTMLファイル冒頭の SUPABASE_URL と SUPABASE_ANON_KEY に書き込んでください。</p>
+    ${msg?`<p class="err">${esc(msg)}</p>`:''}
+    <label class="f">Project URL<input type="text" id="sUrl" placeholder="https://xxxx.supabase.co" value="${esc(cfg().url)}" required></label>
+    <label class="f">anon public key<input type="text" id="sKey" value="${esc(cfg().key)}" required></label>
+    <div class="acts"><button class="btn primary">保存して続ける</button></div><p class="copyline">${esc(COPY)}</p></form>`;
+  $('setupF').onsubmit=e=>{e.preventDefault();lsSet('fa.sbUrl',$('sUrl').value.trim());lsSet('fa.sbKey',$('sKey').value.trim());location.reload()};
+}
+function showLogin(msg){
+  const a=$('auth');a.hidden=false;const last=lsGet('fa.email')||'';
+  a.innerHTML=`<form class="card" id="loginF"><div class="brand">ファシリティ物品台帳<small>ASSET REGISTER</small></div>
+    <p>登録済みのメールアドレスにログイン用のメールを送ります。メール内のリンクを開くか、記載の6桁コードを入力してください。</p>
+    ${msg?`<p class="err">${esc(msg)}</p>`:''}
+    <label class="f">メールアドレス<input type="email" id="lEmail" value="${esc(last)}" autocomplete="email" required></label>
+    <div class="acts"><button class="btn primary" id="lSend">ログイン用メールを送る</button></div>
+    <div id="lCodeW" hidden style="display:grid;gap:8px"><p class="muted" style="margin:0">メールを送りました。届かない場合は迷惑メールフォルダも確認してください。</p>
+      <label class="f">6桁コード（メールに記載がある場合）<input type="text" id="lCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>
+      <div class="acts"><button type="button" class="btn" id="lVerify">コードでログイン</button></div></div>
+    <p class="copyline">${esc(COPY)}</p></form>`;
+  $('loginF').onsubmit=async e=>{e.preventDefault();S.denyMsg=null;const email=$('lEmail').value.trim();if(!email)return;lsSet('fa.email',email);$('lSend').disabled=true;
+    const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:baseUrl(),shouldCreateUser:true}});
+    $('lSend').disabled=false;if(error){toast(errMsg(error),5000);return}$('lCodeW').hidden=false;$('lSend').textContent='もう一度送る'};
+  $('lVerify').onclick=async()=>{const {error}=await sb.auth.verifyOtp({email:$('lEmail').value.trim(),token:$('lCode').value.trim(),type:'email'});if(error)toast('コードが正しくないか、有効期限が切れています。',4000)};
+}
+async function onSession(session){
+  if(!session){S.email=null;showLogin();return}
+  if(S.email===session.user.email)return;
+  S.email=session.user.email;
+  const {data,error}=await sb.from('members').select('role').ilike('email',S.email).maybeSingle();
+  if(error||!data){S.email=null;S.denyMsg=error?errMsg(error):`${session.user.email} はメンバーに登録されていません。管理者に追加を依頼してください。`;await sb.auth.signOut();showLogin(S.denyMsg);return}
+  S.role=data.role;S.canWrite=S.role==='editor'||S.role==='admin';
+  $('auth').hidden=true;$('auth').innerHTML='';
+  $('btnMe').textContent=`${S.email}（${ROLES[S.role]}）`;
+  if(!S.canWrite)banner('閲覧のみの権限です。登録や編集が必要な場合は管理者に依頼してください。');
+  subscribe();await loadSites();
+}
+
+/* ---------- data loading ---------- */
+async function loadSites(){
+  try{const rows=chk(await withRetry(()=>sb.from('sites').select('*').order('code')));S.sites={};rows.forEach(r=>S.sites[r.code]=r)}catch(e){banner(errMsg(e));return}
+  const pend=lsGet('fa.pending');const pref=lsGet('fa.site');const codes=Object.keys(S.sites);
+  await selectSite(S.sites[pref]?pref:codes[0]||null);
+  lsSet('fa.pending',null);if(pend&&location.hash!=='#i-'+pend)openByCode(pend);
+}
+async function selectSite(code){
+  S.site=code;S.floors={};S.rooms={};S.items=new Map();S.floorId='';S.arm=null;S.list.checked.clear();S.list.page=0;
+  if(code)lsSet('fa.site',code);renderAll();if(!code)return;
+  S.loadingItems=true;renderSummary();
+  try{
+    const [fl,rm]=await Promise.all([sb.from('floors').select('*').eq('site_code',code),sb.from('rooms').select('*').eq('site_code',code)]);
+    chk(fl).forEach(f=>S.floors[f.id]=f);chk(rm).forEach(r=>S.rooms[r.id]=r);
+    const pf=lsGet('fa.floor.'+code);S.floorId=S.floors[pf]?pf:(sortedFloors()[0]||{}).id||'';
+    renderPlan(true);
+    for(let from=0;;from+=1000){
+      const rows=chk(await withRetry(()=>sb.from('items').select('*').eq('site_code',code).order('code').range(from,from+999)));
+      if(S.site!==code)return;rows.forEach(r=>S.items.set(r.code,r));if(rows.length<1000)break}
+  }catch(e){banner(errMsg(e))}
+  if(S.site!==code)return;S.loadingItems=false;renderAll();routeHash();
+}
+let channel=null;
+function subscribe(){
+  if(channel)return;
+  channel=sb.channel('fa-all')
+   .on('postgres_changes',{event:'*',schema:'public',table:'items'},p=>{const r=p.new&&p.new.code?p.new:null;if(!r)return;
+      if(r.site_code===S.site){const cur=S.items.get(r.code);if(!cur||tms(cur.updated_at)<=tms(r.updated_at)){S.items.set(r.code,r);scheduleRender()}}
+      else if(S.items.has(r.code)){S.items.delete(r.code);scheduleRender()}})
+   .on('postgres_changes',{event:'*',schema:'public',table:'floors'},p=>{if(p.eventType==='DELETE'){delete S.floors[p.old.id]}else if(p.new.site_code===S.site){S.floors[p.new.id]=p.new}else return;renderPlan(true);renderListFilters();if(S.view==='sites')renderSites()})
+   .on('postgres_changes',{event:'*',schema:'public',table:'rooms'},p=>{if(p.eventType==='DELETE'){delete S.rooms[p.old.id]}else if(p.new.site_code===S.site){S.rooms[p.new.id]=p.new}else return;renderMarkers();if(S.view==='sites')renderSites();if(S.view==='list')renderList()})
+   .on('postgres_changes',{event:'*',schema:'public',table:'sites'},p=>{if(p.eventType==='DELETE'){delete S.sites[p.old.code]}else S.sites[p.new.code]=p.new;renderSiteSel();if(S.view==='sites')renderSites()})
+   .subscribe();
+}
+let rT;function scheduleRender(){clearTimeout(rT);rT=setTimeout(()=>{renderSummary();if(S.view==='plan'){renderMarkers();renderUnplaced()}if(S.view==='list')renderList();if(S.view==='sites')renderSites();if(S.drawerCode&&!S.dirty)openItem(S.drawerCode,true)},150)}
+
+/* ---------- render: chrome ---------- */
+function renderAll(){renderSiteSel();renderSummary();setView(S.view,true)}
+function renderSiteSel(){
+  const sel=$('siteSel');const codes=Object.keys(S.sites).sort();
+  sel.innerHTML=codes.length?codes.map(c=>`<option value="${esc(c)}" ${c===S.site?'selected':''}>${esc(S.sites[c].name||c)}</option>`).join(''):'<option value="">拠点が未登録です</option>';
+}
+function renderSummary(){
+  const el=$('summary');if(!S.site){el.innerHTML='<span class="total">拠点を登録すると、ここに状態別の件数が出ます。</span>';return}
+  const its=liveItems();const cnt={};its.forEach(it=>cnt[it.status||'使用中']=(cnt[it.status||'使用中']||0)+1);
+  const placed=its.filter(it=>it.floor_id&&it.x!=null&&!GONE.has(it.status)).length;
+  el.innerHTML=`<span class="total">${S.loadingItems?'読み込み中…':`物品 <b>${its.length.toLocaleString()}</b> 件 · 図面配置 <b>${placed.toLocaleString()}</b>`}</span>`+
+    STATUSES.map(s=>`<button class="chip" data-st="${s.k}" aria-pressed="${S.showSt.has(s.k)}" title="クリックで表示／非表示"><span class="dot" style="background:var(${s.v})"></span>${s.k} <b>${(cnt[s.k]||0).toLocaleString()}</b></button>`).join('');
+}
+function setView(v,force){
+  if(S.view===v&&!force)return;S.view=v;
+  ['plan','list','sites','io'].forEach(k=>$('v-'+k).hidden=k!==v);
+  document.querySelectorAll('#tabs button,#bnav button[data-v]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.v===v)));
+  if(v==='plan')renderPlan(true);if(v==='list')renderList();if(v==='sites')renderSites();if(v==='io')renderIO();
+}
+
+/* ---------- plan ---------- */
+const T={x:0,y:0,k:1};let fitted='';
+function sortedFloors(){return Object.values(S.floors).sort((a,b)=>(a.ord??0)-(b.ord??0)||String(a.name).localeCompare(b.name,'ja',{numeric:true}))}
+function curFloor(){return S.floors[S.floorId]}
+function roomName(id){return id&&S.rooms[id]?S.rooms[id].name:''}
+function floorName(id){return id&&S.floors[id]?S.floors[id].name:''}
+function renderPlan(refit){
+  const fs=sortedFloors();const sel=$('floorSel');
+  sel.innerHTML=fs.length?fs.map(f=>`<option value="${esc(f.id)}" ${f.id===S.floorId?'selected':''}>${esc(f.name)}${f.asset_path?'':'（図面なし）'}</option>`).join(''):'<option value="">フロア未登録</option>';
+  const f=curFloor();const img=$('planImg');const empty=$('planEmpty');
+  if(!S.site){empty.hidden=false;empty.innerHTML=`<div><strong>拠点がまだありません</strong><span>「取込・出力」からファシリティデータ集計表を読み込むと、拠点と部屋がまとめて登録されます。</span><button class="btn primary" data-go="io">取込・出力を開く</button></div>`;$('plane').hidden=true}
+  else if(!f||!f.asset_path){empty.hidden=false;empty.innerHTML=`<div><strong>${f?esc(f.name)+' の図面が未登録です':'フロア図面がありません'}</strong><span>PDF・DXF・画像（PNG/JPG）を追加できます。DWGはCADからPDFかDXFで書き出してください。</span>${S.canWrite?`<button class="btn primary" data-adddraw="${f?esc(f.id):''}">図面を追加</button>`:''}</div>`;$('plane').hidden=true}
+  else{empty.hidden=true;$('plane').hidden=false;
+    if(img.dataset.path!==f.asset_path){img.dataset.path=f.asset_path;img.removeAttribute('src');fileUrl(f.asset_path).then(u=>{if(img.dataset.path!==f.asset_path)return;if(!u){toast('図面を読み込めませんでした。');return}img.onload=()=>{fitted='';fit()};img.src=u})}
+    img.style.width=f.w+'px';img.style.height=f.h+'px';$('plane').style.width=f.w+'px';$('plane').style.height=f.h+'px';
+    if(refit&&fitted!==f.id+':'+f.asset_path)requestAnimationFrame(fit)}
+  renderMarkers();renderUnplaced();
+  $('btnEdit').classList.toggle('on',S.edit);$('btnEdit').setAttribute('aria-pressed',String(S.edit));
+  $('btnLabels').classList.toggle('on',S.labels);$('btnLabels').setAttribute('aria-pressed',String(S.labels));
+  $('stage').classList.toggle('edit',S.edit);$('btnAddFloor').hidden=!S.canWrite;
+}
+function fit(){const f=curFloor();if(!f||!f.w)return;const r=$('stage').getBoundingClientRect();if(!r.width)return;
+  T.k=Math.min(r.width/f.w,r.height/f.h)*.94;T.x=(r.width-f.w*T.k)/2;T.y=(r.height-f.h*T.k)/2;fitted=f.id+':'+f.asset_path;applyT()}
+function applyT(){const p=$('plane');p.style.transform=`translate(${T.x}px,${T.y}px) scale(${T.k})`;p.style.setProperty('--inv',1/T.k);p.classList.toggle('labels',S.labels||T.k>=.9)}
+function zoomAt(px,py,nk){nk=Math.max(.02,Math.min(8,nk));T.x=px-(px-T.x)*nk/T.k;T.y=py-(py-T.y)*nk/T.k;T.k=nk;applyT()}
+function visible(it){return !it.deleted&&S.showSt.has(it.status||'使用中')}
+function renderMarkers(){
+  const f=curFloor();const L=$('layer'),R=$('rlayer');if(!f||!f.w){L.innerHTML='';R.innerHTML='';return}
+  let h='';for(const it of S.items.values()){if(it.floor_id!==S.floorId||it.x==null||!visible(it))continue;
+    h+=`<div class="mk${S.sel===it.code?' sel':''}" data-code="${esc(it.code)}" style="left:${it.x*f.w}px;top:${it.y*f.h}px;--c:${ST_COLOR[it.status]||'var(--st-use)'}"><i title="${esc(it.code+' '+(it.name||''))}"></i><span>${esc(it.code)}</span></div>`}
+  L.innerHTML=h;
+  R.innerHTML=Object.values(S.rooms).filter(r=>r.floor_id===S.floorId&&r.x!=null).map(r=>`<div class="rm" style="left:${r.x*f.w}px;top:${r.y*f.h}px"><b>${esc(r.name)}</b></div>`).join('');
+}
+function unplacedList(){const q=$('upQ').value.trim().toLowerCase();
+  return liveItems().filter(it=>!GONE.has(it.status)&&(it.x==null||!it.floor_id||!S.floors[it.floor_id]))
+    .filter(it=>!q||(it.code+' '+(it.name||'')+' '+(it.category||'')).toLowerCase().includes(q)).sort((a,b)=>String(a.code).localeCompare(b.code,'ja',{numeric:true}))}
+function renderUnplaced(){
+  const list=unplacedList();$('upCount').textContent=list.length?list.length.toLocaleString()+'件':'';
+  const el=$('unplaced');
+  if(!list.length){el.innerHTML=`<p class="muted hint" style="padding:8px">${S.site?'未配置の物品はありません。':''}</p>`;return}
+  el.innerHTML=list.slice(0,400).map(it=>`<div class="up${S.arm===it.code?' armed':''}" draggable="true" data-code="${esc(it.code)}"><span class="code">${esc(it.code)}</span><span class="nm">${esc(it.name||'（品名なし）')}</span><span class="sub">${esc([it.category,roomName(it.room_id)].filter(Boolean).join(' · '))}</span></div>`).join('')+(list.length>400?`<p class="muted hint" style="padding:8px">ほか ${list.length-400} 件。検索で絞り込んでください。</p>`:'');
+}
+function planPoint(cx,cy){const r=$('stage').getBoundingClientRect();const f=curFloor();if(!f)return null;
+  const x=((cx-r.left-T.x)/T.k)/f.w,y=((cy-r.top-T.y)/T.k)/f.h;if(x<0||y<0||x>1||y>1)return null;return {x:+x.toFixed(5),y:+y.toFixed(5)}}
+async function placeItem(code,pt){const it=S.items.get(code);if(!it||!pt)return;
+  if(!S.canWrite){toast('閲覧のみの権限のため配置できません。');return}
+  const was=it.x!=null&&it.floor_id===S.floorId;const from=it.floor_id;
+  await saveItem({...it,floor_id:S.floorId,x:pt.x,y:pt.y},was?'位置を移動':'図面に配置',from&&from!==S.floorId?`フロア ${floorName(from)}→${floorName(S.floorId)}`:floorName(S.floorId));
+}
+
+/* ---------- item save ---------- */
+function buildRow(it,action,detail,prev){
+  const at=nowIso();const h=(prev&&prev.history)||it.history||[];
+  const row=pick({...it,site_code:it.site_code||S.site,updated_at:at,updated_by_email:S.email,history:[...h,{at,by:S.email,a:action,d:detail||''}].slice(-100)},ITEM_COLS);
+  if(!row.created_at)row.created_at=at;if(row.deleted==null)row.deleted=false;if(!row.status)row.status='使用中';
+  return row;
+}
+async function saveItem(it,action,detail){
+  const prev=S.items.get(it.code);const row=buildRow(it,action,detail,prev);
+  S.items.set(row.code,row);scheduleRender();
+  try{chk(await withRetry(()=>sb.from('items').upsert(row)))}
+  catch(e){if(prev)S.items.set(row.code,prev);else S.items.delete(row.code);scheduleRender();toast(errMsg(e),4500);throw e}
+  return row;
+}
+async function saveItems(rows,onProg){let done=0;const errs=[];
+  for(const part of chunks(rows,300)){try{chk(await withRetry(()=>sb.from('items').upsert(part)));part.forEach(r=>S.items.set(r.code,r))}catch(e){errs.push(e)}done+=part.length;onProg&&onProg(done,rows.length)}
+  scheduleRender();return errs}
+async function nextCodes(n){
+  const out=[];let guard=0;
+  while(out.length<n&&guard++<5){const got=chk(await withRetry(()=>sb.rpc('next_codes',{p_site:S.site,p_n:n-out.length})));for(const c of got){if(!S.items.has(c))out.push(c)}}
+  if(out.length<n)throw new Error('物品IDを採番できませんでした。');return out;
+}
+
+/* ---------- drawer ---------- */
+let draft=null;
+function newItem(code){
+  if(!S.site){toast('先に拠点を登録してください。');return}
+  if(!S.canWrite){toast('閲覧のみの権限のため登録できません。');return}
+  draft={code:code||'',name:'',category:'',maker:'',model:'',qty:1,status:'使用中',floor_id:S.floorId||'',room_id:'',x:null,y:null,note:'',_new:true};
+  S.dirty=false;S.drawerCode=null;drawDrawer();
+}
+function openItem(code,refresh){
+  const it=S.items.get(code);if(!it||it.deleted){if(!refresh)toast(`${code} は登録されていません。`);return}
+  if(refresh&&S.dirty)return;
+  draft=JSON.parse(JSON.stringify(it));S.drawerCode=code;S.dirty=false;S.sel=code;drawDrawer();renderMarkers();
+  if(location.hash!=='#i-'+code&&/^[A-Za-z0-9-]+$/.test(code))history.replaceState(null,'','#i-'+code);
+}
+function closeDrawer(){$('drawerHost').innerHTML='';draft=null;S.drawerCode=null;S.sel=null;S.dirty=false;renderMarkers();if(location.hash)history.replaceState(null,'',location.pathname+location.search)}
+function stSeg(cur){return `<div class="stseg" id="dSt">${STATUSES.map(s=>`<button type="button" data-st="${s.k}" style="--c:var(${s.v})" aria-pressed="${s.k===cur}">${s.k}</button>`).join('')}</div>`}
+function drawDrawer(){
+  const d=draft;const isNew=d._new;const ro=S.canWrite?'':'disabled';
+  const floors=sortedFloors();const rooms=Object.values(S.rooms).sort((a,b)=>String(a.name).localeCompare(b.name,'ja',{numeric:true}));
+  const cats=[...new Set([...CATS,...liveItems().map(i=>i.category).filter(Boolean)])];
+  const fl=d.floor_id&&S.floors[d.floor_id];
+  $('drawerHost').hidden=false;
+  $('drawerHost').innerHTML=`<div class="scrim" data-a="close"></div><aside class="drawer" role="dialog" aria-label="物品">
+    <div class="dh">${d.code?`<span class="code">${esc(d.code)}</span>`:'<span class="code">新規</span>'}<h2>${isNew?'物品を登録':esc(d.name||'（品名なし）')}</h2><button class="btn sm" data-a="close">閉じる</button></div>
+    <form class="db" id="dForm" autocomplete="off">
+      <div class="photo"><div class="ph" id="dPh">${d.photo_path?'読み込み中…':'写真なし'}</div>
+        <div style="display:grid;gap:6px;justify-items:start">${S.canWrite?`<button type="button" class="btn sm" data-a="photo">${d.photo_path?'写真を撮り直す':'写真を撮る／選ぶ'}</button>${d.photo_path?'<button type="button" class="btn sm" data-a="nophoto">写真を外す</button>':''}`:''}</div></div>
+      ${isNew?`<label class="f">物品ID（空欄なら自動採番。貼付済みラベルがあればその番号）<input type="text" id="dCode" value="${esc(d.code)}" placeholder="${esc(S.site)}-00001"></label>`:''}
+      <label class="f">品名<input type="text" id="dName" value="${esc(d.name)}" required ${ro}></label>
+      <div class="g2"><label class="f">種別<input type="text" id="dCat" list="catList" value="${esc(d.category)}" ${ro}></label>
+        <label class="f">数量<input type="number" id="dQty" min="0" step="1" value="${esc(d.qty??1)}" ${ro}></label></div>
+      <datalist id="catList">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+      <div class="g2"><label class="f">メーカー<input type="text" id="dMaker" value="${esc(d.maker)}" ${ro}></label><label class="f">型番<input type="text" id="dModel" value="${esc(d.model)}" ${ro}></label></div>
+      <div style="display:grid;gap:4px"><span style="font-size:12px;color:var(--muted)">状態</span>${stSeg(d.status||'使用中')}</div>
+      <label class="f" id="dDestW" ${/転用/.test(d.status)?'':'hidden'}>転用先（拠点・部門・用途など）<input type="text" id="dDest" value="${esc(d.dest)}" ${ro}></label>
+      <div class="g2"><label class="f">フロア<select id="dFloor" ${ro}><option value="">未設定</option>${floors.map(f=>`<option value="${esc(f.id)}" ${f.id===d.floor_id?'selected':''}>${esc(f.name)}</option>`).join('')}</select></label>
+        <label class="f">部屋・エリア<select id="dRoom" ${ro}><option value="">未設定</option>${rooms.map(r=>`<option value="${esc(r.id)}" ${r.id===d.room_id?'selected':''}>${esc(r.name)}${r.area?`（${r.area}㎡）`:''}</option>`).join('')}</select></label></div>
+      <div class="posbox"><span>${fl&&d.x!=null?`図面上の位置：${esc(fl.name)} に配置済み`:'図面上の位置：未配置'}</span><span class="grow"></span>
+        ${fl&&fl.asset_path?`<button type="button" class="btn sm" data-a="pick" ${ro}>図面で指定</button>`:'<span class="muted hint">フロアを選ぶと図面で指定できます</span>'}
+        ${d.x!=null?`<button type="button" class="btn sm" data-a="unplace" ${ro}>位置を外す</button>`:''}</div>
+      <label class="f">備考<textarea id="dNote" rows="2" ${ro}>${esc(d.note)}</textarea></label>
+      ${S.canWrite?'<label class="f">変更メモ（履歴に残ります・任意）<input type="text" id="dMemo" placeholder="例：レイアウト変更で3F倉庫へ"></label>':''}
+      ${!isNew?`<div class="qrbox"><div id="dQr"></div><div style="display:grid;gap:4px;font-size:12px" class="muted"><span>ラベル用QR</span><span>スマホのカメラで読むとこの物品が開きます。</span></div></div>
+      <div class="hist"><h3 class="lbl">変更履歴</h3><ol id="dHist"></ol></div>
+      ${S.canWrite?`<details class="adv"><summary>拠点の移動・登録取消</summary><div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="dMoveSite">${Object.keys(S.sites).sort().filter(c=>c!==S.site).map(c=>`<option value="${esc(c)}">${esc(S.sites[c].name||c)}</option>`).join('')||'<option value="">移動先の拠点がありません</option>'}</select><button type="button" class="btn sm" data-a="move">この拠点へ移す</button></div>
+        <p class="muted hint">別拠点へ移すと、移動先でフロア・部屋・位置の再設定が必要です。IDと履歴は引き継ぎます。</p>
+        <div><button type="button" class="btn sm danger" data-a="delete">登録を取り消す（誤登録用）</button></div></div></details>`:''}`:''}
+    </form>
+    <div class="df"><span class="grow"></span><button class="btn" data-a="close">閉じる</button>${S.canWrite?`<button class="btn primary" data-a="save">${isNew?'登録する':'保存'}</button>`:''}</div>
+  </aside>`;
+  const dr=$('drawerHost');
+  dr.querySelector('#dForm').addEventListener('input',()=>{S.dirty=true});
+  dr.querySelector('#dForm').addEventListener('submit',e=>{e.preventDefault();saveDrawer()});
+  dr.querySelector('#dFloor').addEventListener('change',e=>{readForm();draft.floor_id=e.target.value;const orig=S.items.get(draft.code);if(!orig||draft.floor_id!==orig.floor_id){draft.x=null;draft.y=null}S.dirty=true;drawDrawer()});
+  if(d.photo_path)fileUrl(d.photo_path).then(u=>{const ph=document.getElementById('dPh');if(ph&&draft===d)ph.innerHTML=u?`<img src="${esc(u)}" alt="">`:'表示できません'});
+  if(!isNew){renderHist();renderQr(d.code,dr.querySelector('#dQr'))}
+}
+function renderHist(){const ol=document.getElementById('dHist');if(!ol)return;const it=S.items.get(S.drawerCode);const h=((it&&it.history)||[]).slice().reverse();
+  ol.innerHTML=h.length?h.map(e=>`<li><time>${fmtDT(e.at)}</time><span>${esc(e.a)}${e.d?` <span class="muted">${esc(e.d)}</span>`:''}</span><span class="who">${esc(e.by||'')}</span></li>`).join(''):'<li class="muted">履歴はまだありません</li>'}
+function readForm(){const g=id=>{const e=document.getElementById(id);return e?e.value:undefined};
+  if(g('dCode')!==undefined)draft.code=g('dCode').trim();
+  draft.name=g('dName').trim();draft.category=g('dCat').trim();draft.qty=num(g('dQty'))??1;draft.maker=g('dMaker').trim();draft.model=g('dModel').trim();
+  draft.floor_id=g('dFloor')||null;draft.room_id=g('dRoom')||null;draft.note=g('dNote');const dd=g('dDest');if(dd!==undefined)draft.dest=dd.trim();draft._memo=(g('dMemo')||'').trim()}
+const LBL={name:'品名',category:'種別',qty:'数量',maker:'メーカー',model:'型番',note:'備考',photo_path:'写真'};
+async function saveDrawer(){
+  readForm();const d=draft;if(!d.name){toast('品名を入力してください。');document.getElementById('dName').focus();return}
+  const btn=document.querySelector('[data-a=save]');btn.disabled=true;
+  try{
+    if(d._new){
+      if(d.code){d.code=safeId(d.code);
+        const ex=S.items.get(d.code)||chk(await sb.from('items').select('code,site_code,deleted').eq('code',d.code).maybeSingle());
+        if(ex&&!ex.deleted){toast(`${d.code} は登録済みです${ex.site_code&&ex.site_code!==S.site?`（${ex.site_code}）`:''}。別のIDにしてください。`,4500);btn.disabled=false;return}}
+      else d.code=(await nextCodes(1))[0];
+      const it={...d};delete it._new;delete it._memo;
+      await saveItem(it,'新規登録',[d.status!=='使用中'?d.status:'',d._memo].filter(Boolean).join(' / '));
+      toast(`${d.code} を登録しました`);S.dirty=false;openItem(d.code);
+    }else{
+      const prev=S.items.get(d.code);const ch=[];let action='情報を更新';
+      if((prev.status||'使用中')!==(d.status||'使用中'))action=`状態変更：${prev.status||'使用中'}→${d.status}`;
+      if((prev.floor_id||null)!==(d.floor_id||null))ch.push(`フロア ${floorName(prev.floor_id)||'未設定'}→${floorName(d.floor_id)||'未設定'}`);
+      if((prev.room_id||null)!==(d.room_id||null))ch.push(`部屋 ${roomName(prev.room_id)||'未設定'}→${roomName(d.room_id)||'未設定'}`);
+      if((prev.dest||'')!==(d.dest||'')&&d.dest)ch.push('転用先 '+d.dest);
+      Object.keys(LBL).forEach(k=>{if(String(prev[k]??'')!==String(d[k]??''))ch.push(LBL[k])});
+      if(prev.x!==d.x||prev.y!==d.y)ch.push(d.x==null?'位置を解除':'位置を変更');
+      if(!ch.length&&action==='情報を更新'&&!d._memo){toast('変更はありません');btn.disabled=false;return}
+      const it={...d};delete it._memo;
+      await saveItem(it,action,[ch.join('、'),d._memo].filter(Boolean).join(' / '));
+      toast('保存しました');S.dirty=false;openItem(d.code);
+    }
+  }catch(e){toast(errMsg(e),4500);btn.disabled=false}
+}
+async function onDrawerClick(e){
+  const st=e.target.closest('#dSt button');
+  if(st){if(!S.canWrite)return;readForm();draft.status=st.dataset.st;S.dirty=true;document.querySelectorAll('#dSt button').forEach(b=>b.setAttribute('aria-pressed',String(b===st)));$('dDestW').hidden=!/転用/.test(draft.status);return}
+  const el=e.target.closest('[data-a]');if(!el)return;const a=el.dataset.a;
+  if(a==='close'){if(S.dirty&&!(await ask('変更を破棄しますか','保存していない変更があります。','破棄する',true)))return;closeDrawer()}
+  if(a==='save')saveDrawer();
+  if(a==='photo'){readForm();$('fPhoto').click()}
+  if(a==='nophoto'){readForm();draft.photo_path=null;S.dirty=true;drawDrawer()}
+  if(a==='unplace'){readForm();draft.x=null;draft.y=null;S.dirty=true;drawDrawer()}
+  if(a==='pick'){readForm();startPick()}
+  if(a==='move')moveSite();
+  if(a==='delete')deleteItem();
+}
+function startPick(){
+  if(!draft.floor_id)return;S.floorId=draft.floor_id;S.pick={item:true};
+  $('drawerHost').hidden=true;setView('plan',true);$('stage').classList.add('pick');
+  banner('図面上で物品の位置をタップしてください。',' <button class="btn sm" id="pickCancel">やめる</button>');
+  $('pickCancel').onclick=()=>endPick(null);
+}
+function endPick(pt){$('stage').classList.remove('pick');const was=S.pick;S.pick=null;banner(S.canWrite?'':'閲覧のみの権限です。');
+  if(was&&was.room){setView('sites');return}
+  $('drawerHost').hidden=false;if(pt&&draft){draft.x=pt.x;draft.y=pt.y;draft.floor_id=S.floorId;S.dirty=true;drawDrawer()}}
+async function onPhoto(file){
+  if(!file||!draft)return;toast('写真を縮小してアップロードしています…',10000);
+  try{const blob=await shrinkImage(file,1280,.82);const path=`photos/${S.site}/${safeId(draft.code||'new')}-${Date.now()}.jpg`;await uploadFile(path,blob);
+    draft.photo_path=path;S.dirty=true;drawDrawer();toast('写真を追加しました。保存すると確定します。')}
+  catch(e){toast(errMsg(e),4500)}
+}
+async function moveSite(){
+  const target=document.getElementById('dMoveSite').value;if(!target)return;
+  if(!(await ask('拠点を移しますか',`<span class="code">${esc(draft.code)}</span> を <b>${esc(S.sites[target].name||target)}</b> へ移します。移動先ではフロア・部屋・位置が未設定になります。`,'移す')))return;
+  const prev=S.items.get(draft.code);
+  try{const row=buildRow({...prev,site_code:target,floor_id:null,room_id:null,x:null,y:null},`拠点移動：${S.site}→${target}`,'',prev);
+    chk(await withRetry(()=>sb.from('items').upsert(row)));S.items.delete(prev.code);S.dirty=false;closeDrawer();scheduleRender();toast(`${prev.code} を移しました`)}
+  catch(e){toast(errMsg(e),4500)}
+}
+async function deleteItem(){
+  if(!(await ask('登録を取り消しますか',`<span class="code">${esc(draft.code)}</span> を台帳から外します。廃棄した物品は取り消さず、状態を「廃棄済」にしてください（履歴が残ります）。`,'取り消す',true)))return;
+  const prev=S.items.get(draft.code);
+  try{await saveItem({...prev,deleted:true},'登録取消','');S.dirty=false;closeDrawer();toast('取り消しました')}catch(e){}
+}
+
+/* ---------- images ---------- */
+function fileToImage(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file);const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('画像を読み込めませんでした。'));im.src=u})}
+async function shrinkImage(file,max,q){const im=await fileToImage(file);const s=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight));
+  const c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',q))}
+const canvasBlob=(c,type='image/png',q)=>new Promise(r=>c.toBlob(r,type,q));
+
+/* ---------- drawings ---------- */
+let drawTarget=null;
+function addDrawing(floorId){if(!S.canWrite){toast('図面の追加には編集権限が必要です。');return}if(!S.site){toast('先に拠点を登録してください。');return}drawTarget=floorId||null;$('fDraw').click()}
+async function onDrawing(file){
+  if(!file)return;const ext=(file.name.split('.').pop()||'').toLowerCase();
+  if(ext==='dwg'){modal(`<h3>DWGはそのまま読み込めません</h3><p>ブラウザではDWG形式を開けないため、CADソフトでPDFまたはDXF形式に書き出してから追加してください。</p><div class="acts"><button class="btn primary" data-close="1">閉じる</button></div>`);return}
+  const b=modal(`<h3>図面を追加</h3><p class="muted" style="margin:0">${esc(file.name)}</p>
+    ${drawTarget?`<p style="margin:0">「${esc(floorName(drawTarget))}」の図面として登録します。差し替えても、配置済みの物品の位置（図面に対する比率）は保たれます。</p>`:`<label class="f">フロア名<input type="text" id="mFl" value="${esc(file.name.replace(/\.[^.]+$/,''))}"></label>`}
+    ${ext==='pdf'?'<label class="f">PDFのページ番号<input type="number" id="mPg" value="1" min="1"></label>':''}
+    <div class="prog"><i id="mProg"></i></div><p class="muted hint" id="mMsg"></p>
+    <div class="acts"><button class="btn" data-close="1">キャンセル</button><button class="btn primary" id="mGo">読み込む</button></div>`);
+  b.querySelector('#mGo').onclick=async()=>{
+    const flName=drawTarget?null:(b.querySelector('#mFl').value.trim()||'フロア');const page=ext==='pdf'?Math.max(1,parseInt(b.querySelector('#mPg').value)||1):1;
+    const msg=t=>{b.querySelector('#mMsg').textContent=t},prog=p=>{b.querySelector('#mProg').style.width=p+'%'};
+    b.querySelector('#mGo').disabled=true;
+    try{
+      msg('図面を画像に変換しています…');prog(15);
+      let canvas;
+      if(ext==='pdf')canvas=await renderPdf(file,page);
+      else if(ext==='dxf')canvas=await renderDxf(file);
+      else{const im=await fileToImage(file);const s=Math.min(1,6000/Math.max(im.naturalWidth,im.naturalHeight));canvas=document.createElement('canvas');canvas.width=Math.round(im.naturalWidth*s);canvas.height=Math.round(im.naturalHeight*s);const g=canvas.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,canvas.width,canvas.height);g.drawImage(im,0,0,canvas.width,canvas.height)}
+      prog(55);msg('アップロードしています…');
+      let blob=await canvasBlob(canvas,'image/png'),extOut='png';if(blob.size>12*1024*1024){blob=await canvasBlob(canvas,'image/jpeg',.85);extOut='jpg'}
+      const path=`drawings/${S.site}/${Date.now()}.${extOut}`;await uploadFile(path,blob);prog(85);
+      const data={asset_path:path,w:canvas.width,h:canvas.height,src:file.name,src_type:ext,updated_at:nowIso()};
+      let fid=drawTarget,row;
+      if(fid)row=chk(await withRetry(()=>sb.from('floors').update(data).eq('id',fid).select().single()));
+      else row=chk(await withRetry(()=>sb.from('floors').insert({...data,site_code:S.site,name:flName,ord:sortedFloors().length}).select().single()));
+      S.floors[row.id]=row;fid=row.id;
+      prog(100);S.floorId=fid;lsSet('fa.floor.'+S.site,fid);fitted='';closeModal();toast('図面を登録しました');setView('plan',true);
+    }catch(e){msg('');b.querySelector('#mGo').disabled=false;b.querySelector('#mMsg').innerHTML=`<span class="err">${esc(errMsg(e))}</span>`}
+  };
+}
+async function renderPdf(file,page){
+  await need('pdf');const lib=window.pdfjsLib;lib.GlobalWorkerOptions.workerSrc=PDF_WORKER;
+  const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  if(page>doc.numPages)throw new Error(`このPDFは${doc.numPages}ページまでです。`);
+  const pg=await doc.getPage(page);const v1=pg.getViewport({scale:1});const sc=Math.min(4200/Math.max(v1.width,v1.height),6);
+  const vp=pg.getViewport({scale:sc});const c=document.createElement('canvas');c.width=Math.round(vp.width);c.height=Math.round(vp.height);
+  const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);await pg.render({canvasContext:g,viewport:vp}).promise;return c;
+}
+async function renderDxf(file){
+  await need('dxf');const P=window.DxfParser.default||window.DxfParser;const dxf=new P().parseSync(await file.text());
+  if(!dxf||!dxf.entities)throw new Error('DXFを解析できませんでした。');
+  const segs=[],texts=[];
+  const mul=(A,B)=>[A[0]*B[0]+A[2]*B[1],A[1]*B[0]+A[3]*B[1],A[0]*B[2]+A[2]*B[3],A[1]*B[2]+A[3]*B[3],A[0]*B[4]+A[2]*B[5]+A[4],A[1]*B[4]+A[3]*B[5]+A[5]];
+  const ap=(M,p)=>[M[0]*p.x+M[2]*p.y+M[4],M[1]*p.x+M[3]*p.y+M[5]];
+  function arcPts(c,r,a0,a1){const pts=[];if(a1<a0)a1+=Math.PI*2;const n=Math.max(8,Math.ceil((a1-a0)/(Math.PI/24)));for(let i=0;i<=n;i++){const a=a0+(a1-a0)*i/n;pts.push({x:c.x+r*Math.cos(a),y:c.y+r*Math.sin(a)})}return pts}
+  function poly(M,pts,closed){if(!pts)return;for(let i=1;i<pts.length;i++)segs.push([ap(M,pts[i-1]),ap(M,pts[i])]);if(closed&&pts.length>2)segs.push([ap(M,pts[pts.length-1]),ap(M,pts[0])])}
+  function walk(ents,M,depth){for(const e of ents||[]){try{
+    switch(e.type){
+      case'LINE':poly(M,e.vertices,false);break;
+      case'LWPOLYLINE':case'POLYLINE':poly(M,e.vertices,e.shape||e.closed);break;
+      case'CIRCLE':poly(M,arcPts(e.center,e.radius,0,Math.PI*2),false);break;
+      case'ARC':poly(M,arcPts(e.center,e.radius,e.startAngle,e.endAngle),false);break;
+      case'TEXT':case'MTEXT':{const p=e.startPoint||e.position;if(p&&e.text)texts.push({p:ap(M,p),h:(e.textHeight||e.height||250)*Math.hypot(M[0],M[1]),t:String(e.text).replace(/\\[A-Za-z][^;]*;|[{}]|\\P/g,' ').slice(0,40)})}break;
+      case'INSERT':{if(depth>5)break;const bl=dxf.blocks&&dxf.blocks[e.name];if(!bl)break;const r=(e.rotation||0)*Math.PI/180,sx=e.xScale||1,sy=e.yScale||1;const bp=bl.position||{x:0,y:0};
+        const L=[Math.cos(r)*sx,Math.sin(r)*sx,-Math.sin(r)*sy,Math.cos(r)*sy,e.position.x,e.position.y];walk(bl.entities,mul(M,mul(L,[1,0,0,1,-bp.x,-bp.y])),depth+1)}break;
+    }}catch(_){}}}
+  walk(dxf.entities,[1,0,0,1,0,0],0);
+  if(!segs.length)throw new Error('DXFに描画できる線がありません（対応：線・ポリライン・円・円弧・ブロック・文字）。');
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const s of segs)for(const p of s){if(p[0]<x0)x0=p[0];if(p[0]>x1)x1=p[0];if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1]}
+  const W=x1-x0||1,H=y1-y0||1,pad=60,sc=(4200-pad*2)/Math.max(W,H);
+  const c=document.createElement('canvas');c.width=Math.round(W*sc+pad*2);c.height=Math.round(H*sc+pad*2);const g=c.getContext('2d');
+  g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.strokeStyle='#222';g.lineWidth=1.2;g.beginPath();
+  const tx=p=>pad+(p[0]-x0)*sc,ty=p=>pad+(y1-p[1])*sc;
+  for(const s of segs){g.moveTo(tx(s[0]),ty(s[0]));g.lineTo(tx(s[1]),ty(s[1]))}g.stroke();
+  g.fillStyle='#333';for(const t of texts){const px=Math.min(60,t.h*sc);if(px<7)continue;g.font=`${px}px sans-serif`;g.fillText(t.t,tx(t.p),ty(t.p))}
+  return c;
+}
+
+/* ---------- QR ---------- */
+const qrText=code=>/^[A-Za-z0-9-]+$/.test(code)?baseUrl()+'#i-'+code:code;
+async function qrSvg(text){await need('qr');const q=window.qrcode(0,'M');q.addData(text);q.make();return q.createSvgTag(4,0).replace(/ width="\d+px"| height="\d+px"/g,'')}
+async function renderQr(code,el){if(!el)return;try{el.innerHTML=await qrSvg(qrText(code))}catch(e){el.innerHTML='<span class="muted hint">QRを表示できません</span>'}}
+function parseScan(text){const m=String(text).match(/#i-([A-Za-z0-9-]+)/);return (m?m[1]:String(text)).trim()}
+let cam=null;
+function stopCamera(){if(cam){cam.stop=true;if(cam.stream)cam.stream.getTracks().forEach(t=>t.stop());cam=null}}
+async function startScan(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$('fScan').click();return}
+  const b=modal(`<h3>QRを読み取る</h3><div class="scan"><video id="scVid" playsinline muted></video><div class="frame"></div></div><p class="muted hint" id="scMsg">ラベルのQRを枠に収めてください。</p>
+    <div class="acts"><button class="btn" id="scPhoto">写真で読む</button><button class="btn" data-close="1">閉じる</button></div>`);
+  b.querySelector('#scPhoto').onclick=()=>{closeModal();$('fScan').click()};
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}},audio:false});
+    cam={stream,stop:false};const v=b.querySelector('#scVid');v.srcObject=stream;await v.play();
+    const det='BarcodeDetector' in window?new window.BarcodeDetector({formats:['qr_code']}):null;if(!det)await need('jsqr');
+    const c=document.createElement('canvas');const g=c.getContext('2d',{willReadFrequently:true});const me=cam;
+    const tick=async()=>{if(me.stop)return;let text=null;
+      try{if(v.videoWidth){if(det){const r=await det.detect(v);if(r[0])text=r[0].rawValue}else{const w=640,h=Math.round(v.videoHeight*640/v.videoWidth);c.width=w;c.height=h;g.drawImage(v,0,0,w,h);const r=window.jsQR(g.getImageData(0,0,w,h).data,w,h);if(r)text=r.data}}}catch(_){}
+      if(text){if(navigator.vibrate)navigator.vibrate(60);closeModal();const code=parseScan(text);toast('読み取り：'+code);openByCode(code);return}
+      setTimeout(tick,180)};tick();
+  }catch(e){b.querySelector('#scMsg').innerHTML='<span class="err">カメラを使えませんでした。ブラウザのカメラ許可を確認するか、「写真で読む」を使ってください。</span>'}
+}
+async function onScanPhoto(file){
+  if(!file)return;toast('QRを読み取っています…',6000);
+  try{const im=await fileToImage(file);const s=Math.min(1,1600/Math.max(im.naturalWidth,im.naturalHeight));const c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);const g=c.getContext('2d');g.drawImage(im,0,0,c.width,c.height);
+    let text=null;
+    if('BarcodeDetector' in window){try{const r=await new window.BarcodeDetector({formats:['qr_code']}).detect(c);if(r[0])text=r[0].rawValue}catch(e){}}
+    if(!text){await need('jsqr');const d=g.getImageData(0,0,c.width,c.height);const r=window.jsQR(d.data,c.width,c.height,{inversionAttempts:'attemptBoth'});if(r)text=r.data}
+    if(!text){toast('QRが見つかりませんでした。ラベルに近づけて、ピントを合わせて撮り直してください。',4500);return}
+    const code=parseScan(text);toast('読み取り：'+code);openByCode(code);
+  }catch(e){toast(errMsg(e))}
+}
+async function openByCode(code){
+  if(!code)return;
+  if(S.items.has(code)&&!S.items.get(code).deleted){openItem(code);return}
+  try{const r=chk(await sb.from('items').select('code,site_code,deleted').eq('code',code).maybeSingle());
+    if(r&&!r.deleted&&S.sites[r.site_code]){if(r.site_code!==S.site){await selectSite(r.site_code);renderSiteSel()}openItem(code);return}}catch(e){toast(errMsg(e));return}
+  if(!S.canWrite){toast(`${code} は台帳にありません。`);return}
+  const pre=code.split('-')[0];if(S.sites[pre]&&pre!==S.site){await selectSite(pre);renderSiteSel()}
+  if(await ask('未登録のIDです',`<span class="code">${esc(code)}</span> はまだ登録されていません。このIDで <b>${esc((S.sites[S.site]||{}).name||'')}</b> に新規登録しますか？`,'このIDで登録'))newItem(code);
+}
+function routeHash(){const m=location.hash.match(/^#i-([A-Za-z0-9-]+)$/);if(!m)return;if(!S.email){lsSet('fa.pending',m[1]);return}if(!S.loadingItems&&S.drawerCode!==m[1])openByCode(m[1])}
+
+/* ---------- list ---------- */
+function renderListFilters(){
+  const keep=(id,v)=>{$(id).value=v};
+  $('lfFloor').innerHTML='<option value="">すべてのフロア</option><option value="_none">フロア未設定</option>'+sortedFloors().map(f=>`<option value="${esc(f.id)}">${esc(f.name)}</option>`).join('');keep('lfFloor',S.list.floor);
+  $('lfRoom').innerHTML='<option value="">すべての部屋</option><option value="_none">部屋未設定</option>'+Object.values(S.rooms).sort((a,b)=>String(a.name).localeCompare(b.name,'ja',{numeric:true})).map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');keep('lfRoom',S.list.room);
+  const cats=[...new Set(liveItems().map(i=>i.category).filter(Boolean))].sort();
+  $('lfCat').innerHTML='<option value="">すべての種別</option>'+cats.map(c=>`<option>${esc(c)}</option>`).join('');keep('lfCat',S.list.cat);
+  if(!$('bulkSt').options.length)$('bulkSt').innerHTML=STATUSES.map(s=>`<option>${s.k}</option>`).join('');
+}
+function listItems(){const L=S.list;const q=L.q.trim().toLowerCase();
+  return liveItems().filter(it=>S.showSt.has(it.status||'使用中'))
+    .filter(it=>!L.floor||(L.floor==='_none'?!it.floor_id:it.floor_id===L.floor))
+    .filter(it=>!L.room||(L.room==='_none'?!it.room_id:it.room_id===L.room))
+    .filter(it=>!L.cat||it.category===L.cat)
+    .filter(it=>!q||[it.code,it.name,it.maker,it.model,it.note,it.dest].join(' ').toLowerCase().includes(q))
+    .sort((a,b)=>String(a.code).localeCompare(b.code,'ja',{numeric:true}))}
+const PER=100;
+function renderList(){
+  renderListFilters();const all=listItems();const L=S.list;const pages=Math.max(1,Math.ceil(all.length/PER));if(L.page>=pages)L.page=pages-1;
+  const rows=all.slice(L.page*PER,L.page*PER+PER);const allChecked=rows.length&&rows.every(r=>L.checked.has(r.code));
+  $('rows').innerHTML=`<div class="row head"><span class="c-chk">${S.canWrite?`<input type="checkbox" id="chkAll" aria-label="このページを全選択" ${allChecked?'checked':''}>`:''}</span><span>物品ID</span><span>品名</span><span>種別</span><span class="num">数量</span><span>状態</span><span>フロア</span><span>部屋</span><span>更新日</span></div>`+
+    (rows.length?rows.map(it=>`<div class="row${GONE.has(it.status)?' gone':''}" data-code="${esc(it.code)}"><span class="c-chk"><input type="checkbox" data-chk="${esc(it.code)}" aria-label="選択" ${L.checked.has(it.code)?'checked':''}></span><span class="c-code"><span class="code">${esc(it.code)}</span></span><span class="c-nm nm">${esc(it.name||'（品名なし）')}${it.photo_path?' <span class="muted" title="写真あり">◉</span>':''}</span><span class="c-cat">${esc(it.category)}</span><span class="c-qty num">${esc(it.qty??'')}</span><span class="c-st"><span class="pill" style="--c:${ST_COLOR[it.status]||'var(--st-use)'}">${esc(it.status||'使用中')}</span></span><span class="c-fl">${esc(floorName(it.floor_id)||'—')}${it.floor_id&&it.x==null?' <span class="muted">未配置</span>':''}</span><span class="c-rm">${esc(roomName(it.room_id)||'—')}</span><span class="c-upd num muted">${fmtD(it.updated_at)}</span></div>`).join('')
+     :`<div class="empty" style="height:auto;padding:40px"><div><strong>${S.items.size?'条件に合う物品はありません':'まだ物品がありません'}</strong><span>${S.items.size?'上の絞り込みや状態のチップを見直してください。':'スマホで実物を見ながら「登録」するか、「取込・出力」からExcelで一括登録できます。'}</span></div></div>`);
+  $('pager').innerHTML=`<span class="num">${all.length.toLocaleString()}件中 ${all.length?L.page*PER+1:0}–${Math.min(all.length,(L.page+1)*PER)}</span><button class="btn sm" data-pg="-1" ${L.page<=0?'disabled':''}>前へ</button><button class="btn sm" data-pg="1" ${L.page>=pages-1?'disabled':''}>次へ</button>`;
+  updBulk();
+}
+function updBulk(){$('bulkBar').hidden=!S.list.checked.size;$('bulkN').textContent=S.list.checked.size;$('bulkApply').hidden=!S.canWrite;$('bulkSt').hidden=!S.canWrite;$('bulkNote').hidden=!S.canWrite}
+async function bulkStatus(){
+  const st=$('bulkSt').value,note=$('bulkNote').value.trim();const its=[...S.list.checked].map(c=>S.items.get(c)).filter(it=>it&&(it.status||'使用中')!==st);
+  if(!its.length){toast('変更が必要な物品はありません');return}
+  if(!(await ask('状態をまとめて変更',`${its.length}件を「${esc(st)}」に変更します。各物品の履歴に記録されます。`,'変更する')))return;
+  const b=modal(`<h3>状態を変更しています</h3><div class="prog"><i id="bp"></i></div><p class="muted num" id="bm" style="margin:0"></p>`);
+  const rows=its.map(it=>buildRow({...it,status:st},`状態変更：${it.status||'使用中'}→${st}`,note,it));
+  const errs=await saveItems(rows,(d,n)=>{b.querySelector('#bp').style.width=(d/n*100)+'%';b.querySelector('#bm').textContent=`${d} / ${n}`});
+  closeModal();S.list.checked.clear();toast(errs.length?errMsg(errs[0]):`${rows.length}件を変更しました`,4000);renderList();
+}
+
+/* ---------- sites & rooms ---------- */
+function roomCounts(){const m={};for(const it of liveItems()){const k=it.room_id||'_none';const s=it.status||'使用中';(m[k]||(m[k]={}))[s]=(m[k][s]||0)+(+it.qty||1)}return m}
+function cntHtml(c){if(!c)return'<span class="muted">—</span>';return `<span class="cnt">${STATUSES.filter(s=>c[s.k]).map(s=>`<span style="--c:var(${s.v})" title="${s.k}">${s.k.slice(0,2)} ${c[s.k]}</span>`).join('')}</span>`}
+const fmtA=v=>v!=null&&v!==''?Number(v).toLocaleString(undefined,{maximumFractionDigits:2}):'—';
+function renderSites(){
+  const w=$('sitesWrap');const s=S.sites[S.site];const ro=S.canWrite?'':'disabled';
+  if(!s){w.innerHTML=`<div class="empty" style="height:auto;padding:48px"><div><strong>拠点がまだありません</strong><span>ファシリティデータ集計表を読み込むか、拠点を手入力で追加してください。</span><div style="display:flex;gap:8px"><button class="btn primary" data-go="io">集計表を読み込む</button>${S.canWrite?'<button class="btn" data-a="addSite">拠点を追加</button>':''}</div></div></div>`;return}
+  const ar=s.areas||{};const rc=roomCounts();
+  const rooms=Object.values(S.rooms).sort((a,b)=>(AREA_COLS.indexOf(a.category)-AREA_COLS.indexOf(b.category))||String(a.name).localeCompare(b.name,'ja',{numeric:true}));
+  const tot=[s.seats_work,s.seats_around,s.seats_terminal].map(v=>num(v)||0).reduce((a,b)=>a+b,0);
+  w.innerHTML=`<div class="toolbar"><h2 class="ttl">${esc(s.name||s.code)}</h2><span class="code">${esc(s.code)}</span><span style="flex:1"></span>${S.canWrite?'<button class="btn sm" data-a="addSite">拠点を追加</button>':''}<button class="btn sm" data-go="io">取込・出力</button></div>
+  <div class="sitegrid">
+    <div class="card"><h4>拠点情報（集計表の値）</h4>
+      <label class="f">表示名<input type="text" data-site="name" value="${esc(s.name)}" ${ro}></label>
+      <div class="g2"><label class="f">業種<input type="text" data-site="industry" value="${esc(s.industry)}" ${ro}></label><label class="f">所在地<input type="text" data-site="location" value="${esc(s.location)}" ${ro}></label></div>
+      <dl class="kv"><dt>座席数（①+②+③）</dt><dd>${tot||'—'}</dd><dt>　①執務席</dt><dd>${s.seats_work??'—'}</dd><dt>　②周辺席</dt><dd>${s.seats_around??'—'}</dd><dt>　③端末席</dt><dd>${s.seats_terminal??'—'}</dd><dt>会議室・応接室数</dt><dd>${s.meeting_rooms??'—'}</dd>${num(s.eff_area)?`<dt>有効面積（壁芯）</dt><dd>${fmtA(s.eff_area)}㎡</dd>`:''}</dl>
+      <h4>面積区分（㎡）</h4><dl class="kv">${AREA_COLS.map(k=>`<dt>${esc(k)}</dt><dd>${fmtA(ar[k])}</dd>`).join('')}</dl>
+      <h4>物品の状態（数量ベース）</h4>${cntHtml(Object.values(rc).reduce((a,c)=>{for(const k in c)a[k]=(a[k]||0)+c[k];return a},{}))}
+    </div>
+    <div class="card"><div class="toolbar"><h2>部屋・エリア</h2><span class="muted hint">集計表の面積を1部屋として取り込んでいます。名前は自由に変えられます。</span><span style="flex:1"></span>${S.canWrite?'<button class="btn sm" data-a="addRoom">部屋を追加</button>':''}</div>
+      <div class="scroll"><table class="tbl"><thead><tr><th>部屋名</th><th>面積区分</th><th class="r">面積㎡</th><th>フロア</th><th>図面</th><th>物品（数量）</th></tr></thead><tbody>
+      ${rooms.map(r=>`<tr><td style="min-width:150px"><input type="text" data-room="${esc(r.id)}" data-k="name" value="${esc(r.name)}" ${ro}></td>
+        <td style="min-width:150px"><select data-room="${esc(r.id)}" data-k="category" ${ro}><option value="">—</option>${AREA_COLS.filter(c=>c!=='執務面積（内法）').map(c=>`<option ${c===r.category?'selected':''}>${esc(c)}</option>`).join('')}</select></td>
+        <td class="r" style="min-width:80px"><input type="number" step="0.01" data-room="${esc(r.id)}" data-k="area" value="${esc(r.area??'')}" ${ro} style="text-align:right"></td>
+        <td style="min-width:110px"><select data-room="${esc(r.id)}" data-k="floor_id" ${ro}><option value="">未設定</option>${sortedFloors().map(f=>`<option value="${esc(f.id)}" ${f.id===r.floor_id?'selected':''}>${esc(f.name)}</option>`).join('')}</select></td>
+        <td>${r.floor_id&&S.floors[r.floor_id]&&S.floors[r.floor_id].asset_path&&S.canWrite?`<button class="btn sm" data-placeroom="${esc(r.id)}">${r.x!=null?'位置を変更':'名前を配置'}</button>`:'<span class="muted hint">—</span>'}</td>
+        <td>${cntHtml(rc[r.id])}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">部屋がありません。</td></tr>'}
+      ${rc._none?`<tr><td class="muted">部屋未設定</td><td></td><td></td><td></td><td></td><td>${cntHtml(rc._none)}</td></tr>`:''}
+      </tbody></table></div>
+      <h4>フロア</h4><div class="scroll"><table class="tbl"><thead><tr><th>フロア名</th><th class="r">並び順</th><th>図面</th><th></th></tr></thead><tbody>
+      ${sortedFloors().map(f=>`<tr><td><input type="text" data-floor="${esc(f.id)}" data-k="name" value="${esc(f.name)}" ${ro}></td><td class="r" style="width:80px"><input type="number" data-floor="${esc(f.id)}" data-k="ord" value="${esc(f.ord??0)}" ${ro} style="text-align:right"></td><td class="muted hint">${f.asset_path?esc(f.src||'登録済み'):'未登録'}</td><td style="white-space:nowrap">${S.canWrite?`<button class="btn sm" data-adddraw="${esc(f.id)}">${f.asset_path?'差し替え':'図面を追加'}</button>`:''}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">フロアがありません。図面タブから追加できます。</td></tr>'}
+      </tbody></table></div>
+    </div></div>`;
+}
+async function onSitesChange(e){
+  const t=e.target;if(!S.canWrite)return;
+  try{
+    if(t.dataset.site){const v=t.value.trim();chk(await withRetry(()=>sb.from('sites').update({[t.dataset.site]:v,updated_at:nowIso()}).eq('code',S.site)));S.sites[S.site][t.dataset.site]=v;renderSiteSel();toast('保存しました')}
+    if(t.dataset.room){let v=t.value;if(t.dataset.k==='area')v=num(v);if(t.dataset.k==='floor_id')v=v||null;const patch={[t.dataset.k]:v,updated_at:nowIso()};if(t.dataset.k==='floor_id'){patch.x=null;patch.y=null}
+      const row=chk(await withRetry(()=>sb.from('rooms').update(patch).eq('id',t.dataset.room).select().single()));S.rooms[row.id]=row;toast('保存しました');if(t.dataset.k==='floor_id')renderSites()}
+    if(t.dataset.floor){let v=t.value;if(t.dataset.k==='ord')v=num(v)||0;const row=chk(await withRetry(()=>sb.from('floors').update({[t.dataset.k]:v}).eq('id',t.dataset.floor).select().single()));S.floors[row.id]=row;renderPlan();toast('保存しました')}
+  }catch(err){toast(errMsg(err),4500)}
+}
+async function onSitesClick(e){
+  const a=e.target.closest('[data-a]');const pr=e.target.closest('[data-placeroom]');
+  if(pr){const r=S.rooms[pr.dataset.placeroom];S.floorId=r.floor_id;S.pick={room:r.id};setView('plan',true);$('stage').classList.add('pick');
+    banner(`図面上で「${r.name}」の名前を置く位置をタップしてください。`,' <button class="btn sm" id="pickCancel">やめる</button>');$('pickCancel').onclick=()=>endPick(null);return}
+  if(!a)return;
+  if(a.dataset.a==='addRoom'){try{const row=chk(await withRetry(()=>sb.from('rooms').insert({site_code:S.site,name:'新しい部屋',floor_id:S.floorId||null}).select().single()));S.rooms[row.id]=row;renderSites();toast('部屋を追加しました')}catch(err){toast(errMsg(err),4500)}}
+  if(a.dataset.a==='addSite'){const b=modal(`<h3>拠点を追加</h3><label class="f">拠点コード（英数字。物品IDの先頭になります）<input type="text" id="nsC" placeholder="S04"></label><label class="f">表示名<input type="text" id="nsN" placeholder="大阪本社"></label><div class="acts"><button class="btn" data-close="1">キャンセル</button><button class="btn primary" id="nsGo">追加</button></div>`);
+    b.querySelector('#nsGo').onclick=async()=>{const c=b.querySelector('#nsC').value.trim().toUpperCase();if(!/^[A-Z0-9]{1,12}$/.test(c)){toast('拠点コードは英数字12文字以内で入力してください。');return}if(S.sites[c]){toast('そのコードは使われています。');return}
+      try{const row=chk(await withRetry(()=>sb.from('sites').insert({code:c,name:b.querySelector('#nsN').value.trim()||c}).select().single()));S.sites[c]=row;closeModal();selectSite(c)}catch(err){toast(errMsg(err),4500)}}}
+}
+
+/* ---------- import / export ---------- */
+async function renderIO(){
+  const w=$('ioWrap');const ro=S.canWrite?'':'disabled';const site=S.sites[S.site];
+  w.innerHTML=`<div class="iogrid">
+   ${S.canWrite?`<div class="card"><h2>ファシリティデータ集計表を読み込む</h2><p>ベンチマークシートの各行を拠点（S01, S02…）として、拠点番号のシート（「1」など）の面積を部屋・エリアとして登録します。再読み込みすると面積だけ更新し、部屋名・フロア・配置は保持します。</p><div class="acts"><button class="btn primary" data-io="fac">集計表を選ぶ</button></div></div>
+   <div class="card"><h2>物品リストをExcelで取り込む</h2><p>現在の拠点（${esc(site?site.name:'未選択')}）に登録します。物品IDが一致する行は上書き更新、空欄は自動採番。X・Y（0〜1）があれば図面にそのまま配置されます。</p>
+     <div class="cols">物品ID / 拠点コード / フロア / 部屋 / 品名 / 種別 / メーカー / 型番 / 数量 / 状態 / 転用先 / 備考 / X / Y</div>
+     <div class="acts"><button class="btn primary" data-io="items" ${S.site?'':'disabled'}>Excelを選ぶ</button><button class="btn" data-io="tpl">取込用テンプレート</button></div></div>`:''}
+   <div class="card"><h2>台帳を書き出す</h2><p>物品一覧・部屋別集計・変更履歴の3シートをExcelで保存します。廃棄済・転用済も含みます。</p><div class="acts"><button class="btn primary" data-io="exp" ${S.site?'':'disabled'}>この拠点を書き出す</button><button class="btn" data-io="expAll">全拠点を書き出す</button></div></div>
+   <div class="card"><h2>QRラベルを印刷する</h2><p>A4・1枚24面（64×33.5mm）のラベルシートを新しいタブで開きます。そこから印刷してください。一覧で選んだ物品だけを出すこともできます。</p>
+     <div class="acts"><select id="qrScope"><option value="floor">表示中のフロアの物品</option><option value="all">この拠点の物品すべて</option><option value="new">直近7日に登録した物品</option></select><button class="btn primary" data-io="qr" ${S.site?'':'disabled'}>ラベルを開く</button></div></div>
+   ${S.role==='admin'?`<div class="card" id="memCard"><h2>メンバー</h2><p>ここに登録したメールアドレスの人だけがログインできます。登録後、本人がログイン画面からメールを受け取ってログインします。</p>
+     <form class="acts" id="memForm"><input type="email" id="memEmail" placeholder="name@example.com" required style="flex:1;min-width:180px"><select id="memRole">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${k==='editor'?'selected':''}>${v}</option>`).join('')}</select><button class="btn primary">追加</button></form>
+     <div class="scroll"><table class="tbl" id="memTbl"><tbody><tr><td class="muted">読み込み中…</td></tr></tbody></table></div></div>`:''}
+  </div>`;
+  if(S.role==='admin')loadMembers();
+}
+async function loadMembers(){
+  const t=$('memTbl');if(!t)return;
+  try{const rows=chk(await sb.from('members').select('*').order('email'));
+    t.innerHTML=`<thead><tr><th>メール</th><th>権限</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.email)}</td><td><select data-mem="${esc(r.email)}" ${r.email.toLowerCase()===S.email.toLowerCase()?'disabled':''}>${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${k===r.role?'selected':''}>${v}</option>`).join('')}</select></td><td class="r">${r.email.toLowerCase()===S.email.toLowerCase()?'<span class="muted hint">あなた</span>':`<button class="btn sm danger" data-memdel="${esc(r.email)}">外す</button>`}</td></tr>`).join('')}</tbody>`}
+  catch(e){t.innerHTML=`<tbody><tr><td class="err">${esc(errMsg(e))}</td></tr></tbody>`}
+}
+async function onIOSubmit(e){if(e.target.id!=='memForm')return;e.preventDefault();
+  try{chk(await sb.from('members').upsert({email:$('memEmail').value.trim().toLowerCase(),role:$('memRole').value}));$('memEmail').value='';toast('追加しました');loadMembers()}catch(err){toast(errMsg(err),4500)}}
+async function onIOChange(e){const m=e.target.dataset.mem;if(!m)return;try{chk(await sb.from('members').update({role:e.target.value}).eq('email',m));toast('権限を変更しました')}catch(err){toast(errMsg(err),4500)}}
+
+async function readWorkbook(file){await need('xlsx');return window.XLSX.read(await file.arrayBuffer(),{type:'array'})}
+const norm=s=>String(s??'').replace(/[\s\n\r　]/g,'').replace(/[()]/g,m=>m==='('?'（':'）');
+async function onFacFile(file){
+  if(!file)return;let wb;try{wb=await readWorkbook(file)}catch(e){toast(errMsg(e));return}
+  const XL=window.XLSX;let bench=null,hdr=-1;const cols={};
+  for(const name of wb.SheetNames){const rows=XL.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null});
+    for(let r=0;r<Math.min(rows.length,15);r++){const row=rows[r]||[];if(row.some(v=>norm(v)==='業種')&&row.some(v=>norm(v).startsWith('執務面積'))){bench={name,rows};hdr=r;row.forEach((v,i)=>{if(v!=null)cols[norm(v)]=i});break}}if(bench)break}
+  if(!bench){toast('「業種」「執務面積」の見出しがあるシートが見つかりませんでした。',4500);return}
+  const ci=k=>{const nk=norm(k);for(const c in cols)if(c===nk||c.startsWith(nk))return cols[c];return -1};
+  const sites=[];
+  for(let r=hdr+1;r<bench.rows.length;r++){const row=bench.rows[r]||[];if(row.some(v=>norm(v)==='業種'))break;const no=row[0];const ind=row[ci('業種')];
+    if(typeof no!=='number'&&!/^\d+$/.test(String(no??'')))continue;if(!ind)continue;
+    const n=parseInt(no);const code='S'+String(n).padStart(2,'0');
+    const areas={};AREA_COLS.forEach(k=>{const i=ci(k);const v=i>=0?num(row[i]):null;if(v!=null)areas[k]=v});
+    const g=k=>{const i=ci(k);return i>=0?num(row[i]):null};
+    sites.push({code,no:n,industry:String(ind),location:String(row[ci('所在地')]??''),seats_work:g('①座席数'),seats_around:g('②座席数'),seats_terminal:g('③座席数'),meeting_rooms:g('会議室・応接室数'),eff_area:g('有効面積'),areas,rooms:[]})}
+  for(const s of sites){const ws=wb.Sheets[String(s.no)];if(!ws)continue;const rows=XL.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    const hr=rows.findIndex(r=>(r||[]).some(v=>norm(v).startsWith('執務面積')));if(hr<0)continue;const head=rows[hr];const idx={};
+    for(let r=hr+1;r<rows.length;r++){const row=rows[r]||[];head.forEach((h,c)=>{const cat=AREA_COLS.find(k=>norm(k)===norm(h));if(!cat||cat==='執務面積（内法）')return;const v=num(row[c]);if(v==null||v<=0)return;
+      idx[cat]=(idx[cat]||0)+1;s.rooms.push({id:`${s.code}-xl-${XL.utils.encode_cell({r,c})}`,site_code:s.code,category:cat,area:+v.toFixed(2),name:cat.replace(/面積.*$/,'')+' '+idx[cat]})})}}
+  const nRooms=sites.reduce((a,s)=>a+s.rooms.length,0);
+  const b=modal(`<h3>集計表の読み込み</h3><p style="margin:0">拠点 <b>${sites.length}</b> 件、部屋・エリア <b>${nRooms}</b> 件が見つかりました。</p>
+    <div class="mini"><table><tr><th>コード</th><th>業種</th><th>所在地</th><th>①+②+③</th><th>部屋</th><th></th></tr>${sites.map(s=>`<tr><td><span class="code">${s.code}</span></td><td>${esc(s.industry)}</td><td>${esc(s.location)}</td><td class="num">${(s.seats_work||0)+(s.seats_around||0)+(s.seats_terminal||0)||'—'}</td><td class="num">${s.rooms.length}</td><td class="muted">${S.sites[s.code]?'更新':'新規'}</td></tr>`).join('')}</table></div>
+    <div class="prog"><i id="fp"></i></div><p class="muted hint" id="fm"></p><div class="acts"><button class="btn" data-close="1">キャンセル</button><button class="btn primary" id="fGo" ${sites.length?'':'disabled'}>登録する</button></div>`);
+  b.querySelector('#fGo').onclick=async()=>{b.querySelector('#fGo').disabled=true;
+    try{
+      for(const [i,s] of sites.entries()){const {rooms,...rest}=s;const doc={...rest,updated_at:nowIso()};
+        if(S.sites[s.code])chk(await withRetry(()=>sb.from('sites').update(doc).eq('code',s.code)));
+        else chk(await withRetry(()=>sb.from('sites').insert({...doc,name:`No.${s.no} ${s.industry}・${s.location}`})));
+        if(rooms.length){const ex=new Set(chk(await sb.from('rooms').select('id').in('id',rooms.map(r=>r.id))).map(r=>r.id));
+          const ins=rooms.filter(r=>!ex.has(r.id));if(ins.length)chk(await withRetry(()=>sb.from('rooms').insert(ins)));
+          for(const r of rooms.filter(r=>ex.has(r.id)))chk(await withRetry(()=>sb.from('rooms').update({area:r.area,category:r.category,updated_at:nowIso()}).eq('id',r.id)))}
+        b.querySelector('#fp').style.width=((i+1)/sites.length*100)+'%'}
+      closeModal();toast('集計表を読み込みました');S.sites={};await loadSites();
+    }catch(e){b.querySelector('#fm').innerHTML=`<span class="err">${esc(errMsg(e))}</span>`;b.querySelector('#fGo').disabled=false}};
+}
+const IMP={code:['物品ID','管理番号','ID','物品番号'],site:['拠点コード'],floor:['フロア','階','フロア名'],room:['部屋','部屋名','エリア','部屋・エリア'],name:['品名','名称','物品名'],category:['種別','分類','カテゴリ'],maker:['メーカー'],model:['型番','品番'],qty:['数量','個数'],status:['状態','ステータス'],dest:['転用先'],note:['備考','メモ'],x:['X','x','X座標'],y:['Y','y','Y座標']};
+async function onItemsFile(file){
+  if(!file)return;let wb;try{wb=await readWorkbook(file)}catch(e){toast(errMsg(e));return}
+  const XL=window.XLSX;let best=null;
+  for(const n of wb.SheetNames){const rows=XL.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null});for(let r=0;r<Math.min(rows.length,10);r++){const row=(rows[r]||[]).map(norm);if(IMP.name.some(k=>row.includes(norm(k)))){best={rows,hr:r,head:row};break}}if(best)break}
+  if(!best){toast('「品名」の見出しがあるシートが見つかりませんでした。テンプレートをお使いください。',4500);return}
+  const col={};for(const k in IMP)col[k]=best.head.findIndex(h=>IMP[k].some(a=>norm(a)===h));
+  const floorsBy={};sortedFloors().forEach(f=>floorsBy[norm(f.name)]=f.id);const roomsBy={};Object.values(S.rooms).forEach(r=>roomsBy[norm(r.name)]=r.id);
+  const recs=[],errs=[];const newFloors=new Set(),newRooms=new Set();
+  for(let r=best.hr+1;r<best.rows.length;r++){const row=best.rows[r]||[];const g=k=>col[k]>=0?row[col[k]]:null;const sv=k=>{const v=g(k);return v==null?'':String(v).trim()};
+    if(!sv('name')&&!sv('code'))continue;if(/^（例）/.test(sv('note')))continue;
+    const site=sv('site')||S.site;if(site!==S.site){errs.push(`${r+1}行目：拠点コード ${site} は表示中の拠点と異なるため読み飛ばしました`);continue}
+    const st=sv('status');if(st&&!ST_COLOR[st]){errs.push(`${r+1}行目：状態「${st}」は使えません（${STATUSES.map(s=>s.k).join('・')}）`);continue}
+    let x=num(g('x')),y=num(g('y'));if((x!=null&&(x<0||x>1))||(y!=null&&(y<0||y>1))){errs.push(`${r+1}行目：X・Yは0〜1で指定してください（位置なしで取り込みます）`);x=y=null}
+    const fl=sv('floor'),rm=sv('room');if(fl&&!floorsBy[norm(fl)])newFloors.add(fl);if(rm&&!roomsBy[norm(rm)])newRooms.add(rm);
+    recs.push({row:r+1,code:sv('code')?safeId(sv('code')):'',name:sv('name'),category:sv('category'),maker:sv('maker'),model:sv('model'),qty:num(g('qty')),status:st,dest:sv('dest'),note:sv('note'),floor:fl,room:rm,x,y})}
+  const withCode=recs.filter(r=>r.code).map(r=>r.code);let elsewhere=new Map();
+  try{for(const part of chunks(withCode.filter(c=>!S.items.has(c)),200)){chk(await sb.from('items').select('code,site_code').in('code',part)).forEach(r=>elsewhere.set(r.code,r.site_code))}}catch(e){}
+  const bad=recs.filter(r=>elsewhere.has(r.code));bad.forEach(r=>errs.push(`${r.row}行目：物品ID ${r.code} は拠点 ${elsewhere.get(r.code)} に登録済みのため読み飛ばしました`));
+  const ok=recs.filter(r=>!elsewhere.has(r.code));const upd=ok.filter(r=>r.code&&S.items.has(r.code)).length;
+  const b=modal(`<h3>物品リストの取り込み</h3>
+    <p style="margin:0">新規 <b class="num">${ok.length-upd}</b> 件 · 更新 <b class="num">${upd}</b> 件${newFloors.size?` · 新しいフロア <b>${newFloors.size}</b>`:''}${newRooms.size?` · 新しい部屋 <b>${newRooms.size}</b>`:''}</p>
+    ${errs.length?`<div class="mini err" style="padding:6px 8px">${errs.slice(0,30).map(esc).join('<br>')}${errs.length>30?`<br>ほか${errs.length-30}件`:''}</div>`:''}
+    <div class="mini"><table><tr><th>行</th><th>物品ID</th><th>品名</th><th>種別</th><th>状態</th><th>フロア</th><th>部屋</th></tr>${ok.slice(0,40).map(r=>`<tr><td class="num">${r.row}</td><td>${r.code?`<span class="code">${esc(r.code)}</span>`:'<span class="muted">自動</span>'}</td><td>${esc(r.name)}</td><td>${esc(r.category)}</td><td>${esc(r.status||'—')}</td><td>${esc(r.floor)}</td><td>${esc(r.room)}</td></tr>`).join('')}</table></div>
+    <div class="prog"><i id="ip"></i></div><p class="muted hint num" id="im"></p>
+    <div class="acts"><button class="btn" data-close="1">キャンセル</button><button class="btn primary" id="iGo" ${ok.length?'':'disabled'}>取り込む</button></div>`,{wide:true});
+  b.querySelector('#iGo').onclick=async()=>{b.querySelector('#iGo').disabled=true;const msg=t=>b.querySelector('#im').textContent=t;
+    try{
+      if(newFloors.size){const rows=chk(await withRetry(()=>sb.from('floors').insert([...newFloors].map((n,i)=>({site_code:S.site,name:n,ord:sortedFloors().length+i}))).select()));rows.forEach(f=>{S.floors[f.id]=f;floorsBy[norm(f.name)]=f.id})}
+      if(newRooms.size){const rows=chk(await withRetry(()=>sb.from('rooms').insert([...newRooms].map(n=>({site_code:S.site,name:n}))).select()));rows.forEach(r=>{S.rooms[r.id]=r;roomsBy[norm(r.name)]=r.id})}
+      const n=ok.filter(r=>!r.code).length;msg(n?`物品IDを${n}件採番しています…`:'');const codes=n?await nextCodes(n):[];let k=0;
+      const rows=ok.map(r=>{const code=r.code||codes[k++];const prev=S.items.get(code);const base=prev&&!prev.deleted?prev:{qty:1,status:'使用中'};
+        const it={...base,code,site_code:S.site,deleted:false,name:r.name||base.name||'',category:r.category||base.category||'',maker:r.maker||base.maker||'',model:r.model||base.model||'',qty:r.qty??base.qty??1,status:r.status||base.status||'使用中',dest:r.dest||base.dest||'',note:r.note||base.note||''};
+        if(r.floor)it.floor_id=floorsBy[norm(r.floor)];if(r.room)it.room_id=roomsBy[norm(r.room)];
+        if(r.x!=null&&r.y!=null){it.x=r.x;it.y=r.y}else if(r.floor&&base.floor_id!==it.floor_id){it.x=null;it.y=null}
+        return buildRow(it,prev&&!prev.deleted?'Excel取込で更新':'Excel取込で登録',file.name,prev)});
+      const errs2=await saveItems(rows,(d,t)=>{b.querySelector('#ip').style.width=(d/t*100)+'%';msg(`${d} / ${t} 件`)});
+      closeModal();toast(errs2.length?`一部を登録できませんでした（${errMsg(errs2[0])}）`:`${rows.length}件を取り込みました`,5000);setView('plan',true);
+    }catch(e){msg(errMsg(e));b.querySelector('#iGo').disabled=false}};
+}
+function download(filename,blob){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+async function xlsxBlob(sheets){await need('xlsx');const XL=window.XLSX;const wb=XL.utils.book_new();
+  for(const [name,aoa,widths] of sheets){const ws=XL.utils.aoa_to_sheet(aoa);if(widths)ws['!cols']=widths.map(w=>({wch:w}));XL.utils.book_append_sheet(wb,ws,name)}
+  return new Blob([XL.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
+const ymd=()=>{const d=new Date();return `${String(d.getFullYear()).slice(2)}${pad2(d.getMonth()+1)}${pad2(d.getDate())}`};
+async function exportTemplate(){
+  const head=['物品ID','拠点コード','フロア','部屋','品名','種別','メーカー','型番','数量','状態','転用先','備考','X','Y'];
+  const ex=[['',S.site||'S01','3F','会議室・応接室 1','会議テーブル W2400','会議テーブル','','',1,'使用中','','（例）この行は取り込まれません','','']];
+  const help=[['列','内容'],['物品ID','空欄なら「拠点コード-連番」で自動採番。既存IDと一致すれば上書き更新'],['拠点コード','空欄なら取り込み時に表示中の拠点'],['フロア','フロア名。未登録の名前なら新しく作成'],['部屋','部屋・エリア名。未登録の名前なら新しく作成'],['状態',STATUSES.map(s=>s.k).join(' / ')],['X・Y','図面の左上を0、右下を1とした位置。空欄なら未配置として取り込み、図面上で配置'],[],[COPY]];
+  download(`物品取込テンプレート_${ymd()}.xlsx`,await xlsxBlob([['物品',[head,...ex],[14,10,10,18,24,14,12,12,6,10,14,28,8,8]],['記入方法',help,[14,80]]]));
+}
+async function fetchSite(sc){
+  if(sc===S.site)return {items:liveItems(),floors:S.floors,rooms:S.rooms};
+  const floors={},rooms={},items=[];chk(await sb.from('floors').select('*').eq('site_code',sc)).forEach(f=>floors[f.id]=f);chk(await sb.from('rooms').select('*').eq('site_code',sc)).forEach(r=>rooms[r.id]=r);
+  for(let from=0;;from+=1000){const rows=chk(await withRetry(()=>sb.from('items').select('*').eq('site_code',sc).eq('deleted',false).order('code').range(from,from+999)));items.push(...rows);if(rows.length<1000)break}
+  return {items,floors,rooms};
+}
+async function exportLedger(all){
+  toast('台帳を集計しています…',10000);
+  try{
+    const codes=all?Object.keys(S.sites).sort():[S.site];
+    const rowsI=[['拠点コード','拠点名','物品ID','品名','種別','メーカー','型番','数量','状態','転用先','フロア','部屋','部屋の面積区分','部屋面積㎡','X','Y','写真','備考','登録日','最終更新日','最終更新者']],
+      rowsR=[['拠点コード','拠点名','部屋','面積区分','面積㎡',...STATUSES.map(s=>s.k),'合計']],rowsH=[['拠点コード','物品ID','品名','日時','内容','詳細','担当']];
+    for(const sc of codes){const site=S.sites[sc];const {items,floors,rooms}=await fetchSite(sc);const agg={};
+      items.sort((a,b)=>String(a.code).localeCompare(b.code,'ja',{numeric:true}));
+      for(const it of items){const rm=rooms[it.room_id]||{};
+        rowsI.push([sc,site.name,it.code,it.name,it.category,it.maker,it.model,it.qty,it.status,it.dest,(floors[it.floor_id]||{}).name||'',rm.name||'',rm.category||'',rm.area??'',it.x??'',it.y??'',it.photo_path?'あり':'',it.note,fmtD(it.created_at),fmtD(it.updated_at),it.updated_by_email||'']);
+        const k=it.room_id||'_none';const s=it.status||'使用中';(agg[k]||(agg[k]={}))[s]=(agg[k][s]||0)+(+it.qty||1);
+        for(const h of it.history||[])rowsH.push([sc,it.code,it.name,fmtDT(h.at),h.a,h.d,h.by||''])}
+      const line=(name,rm,c)=>[sc,site.name,name,rm.category||'',rm.area??'',...STATUSES.map(s=>c[s.k]||0),STATUSES.reduce((a,s)=>a+(c[s.k]||0),0)];
+      Object.entries(rooms).sort((a,b)=>String(a[1].name).localeCompare(b[1].name,'ja',{numeric:true})).forEach(([id,rm])=>rowsR.push(line(rm.name,rm,agg[id]||{})));
+      if(agg._none)rowsR.push(line('（部屋未設定）',{},agg._none))}
+    [rowsI,rowsR,rowsH].forEach(r=>{r.push([]);r.push([COPY])});
+    download(`物品台帳_${all?'全拠点':S.site}_${ymd()}.xlsx`,await xlsxBlob([['物品一覧',rowsI,[8,18,14,24,14,12,12,6,10,14,10,18,16,9,8,8,6,24,11,11,24]],['部屋別集計',rowsR,[8,18,20,18,9,...STATUSES.map(()=>8),8]],['変更履歴',rowsH,[8,14,24,16,24,40,24]]]));
+    toast('書き出しました');
+  }catch(e){toast(errMsg(e),4500)}
+}
+async function openLabels(items){
+  if(!items.length){toast('対象の物品がありません。');return}
+  const w=window.open('','_blank');if(!w){toast('ポップアップがブロックされました。このサイトのポップアップを許可してください。',5000);return}
+  w.document.write('<p style="font-family:sans-serif">ラベルを作成しています…</p>');
+  const site=S.sites[S.site]||{};const cells=[];
+  for(const it of items)cells.push(`<div class="lb"><div class="q">${await qrSvg(qrText(it.code))}</div><div class="t"><div class="c">${esc(it.code)}</div><div class="n">${esc(it.name||'')}</div><div class="s">${esc([site.name,roomName(it.room_id)].filter(Boolean).join(' / '))}</div></div></div>`);
+  const html=`<!doctype html><html lang="ja"><meta charset="utf-8"><title>QRラベル ${esc(S.site)}（${items.length}件）</title><style>@page{size:A4;margin:10mm 8mm}body{margin:0;font-family:"BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif;color:#111}.bar{position:sticky;top:0;background:#24539c;color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;font-size:14px}.bar button{font:inherit;padding:6px 14px;border:0;border-radius:4px;background:#fff;color:#24539c;font-weight:700;cursor:pointer}.sheet{display:grid;grid-template-columns:repeat(3,64mm);grid-auto-rows:33.5mm;gap:0 2mm;justify-content:center}.lb{display:flex;gap:2mm;align-items:center;padding:2mm 3mm;border:.2mm dashed #bbb;box-sizing:border-box;overflow:hidden;break-inside:avoid}.q svg{width:26mm;height:26mm;display:block}.t{min-width:0}.c{font-family:Consolas,monospace;font-weight:700;font-size:11pt;background:#f2d24b;padding:0 1.5mm;display:inline-block}.n{font-size:8pt;margin-top:1mm;line-height:1.25;max-height:2.5em;overflow:hidden}.s{font-size:6.5pt;color:#555;margin-top:1mm}.ft{font-size:7pt;color:#777;text-align:right;margin:4mm 8mm 0}@media print{.bar{display:none}}@media screen{body{background:#eee}.sheet{background:#fff;padding:6mm 0;margin:12px auto;width:210mm}}</style><body><div class="bar"><span>${items.length}件のラベル（A4・24面）</span><button onclick="print()">印刷する</button></div><div class="sheet">${cells.join('')}</div><div class="ft">${esc(COPY)}</div></body></html>`;
+  w.document.open();w.document.write(html);w.document.close();
+}
+async function onIOClick(e){const b=e.target.closest('[data-io]');if(b){const a=b.dataset.io;
+  if(a==='fac')$('fFac').click();if(a==='items')$('fXlsx').click();if(a==='tpl')exportTemplate();if(a==='exp')exportLedger(false);if(a==='expAll')exportLedger(true);
+  if(a==='qr'){const sc=$('qrScope').value;let its=liveItems().filter(i=>!GONE.has(i.status));if(sc==='floor')its=its.filter(i=>i.floor_id===S.floorId);if(sc==='new')its=its.filter(i=>tms(i.created_at)>Date.now()-7*864e5);its.sort((a,b)=>String(a.code).localeCompare(b.code,'ja',{numeric:true}));openLabels(its)}}
+  const del=e.target.closest('[data-memdel]');if(del){const m=del.dataset.memdel;if(!(await ask('メンバーを外しますか',`${esc(m)} はログインできなくなります。`,'外す',true)))return;try{chk(await sb.from('members').delete().eq('email',m));toast('外しました');loadMembers()}catch(err){toast(errMsg(err),4500)}}
+}
+
+/* ---------- interactions ---------- */
+function bindUI(){
+  $('tabs').onclick=e=>{const b=e.target.closest('[data-v]');if(b)setView(b.dataset.v)};
+  $('bnav').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.v)setView(b.dataset.v);if(b.dataset.m==='scan')startScan();if(b.dataset.m==='new')newItem()};
+  $('btnNew').onclick=()=>newItem();$('btnScanTop').onclick=startScan;
+  $('btnMe').onclick=async()=>{if(await ask('ログアウトしますか',esc(S.email||''),'ログアウト')){await sb.auth.signOut();location.reload()}};
+  $('siteSel').onchange=e=>selectSite(e.target.value);
+  $('summary').onclick=e=>{const c=e.target.closest('[data-st]');if(!c)return;const k=c.dataset.st;S.showSt.has(k)?S.showSt.delete(k):S.showSt.add(k);renderSummary();renderMarkers();if(S.view==='list')renderList()};
+  $('floorSel').onchange=e=>{S.floorId=e.target.value;S.arm=null;lsSet('fa.floor.'+S.site,S.floorId);fitted='';renderPlan(true)};
+  $('btnAddFloor').onclick=()=>addDrawing();
+  $('btnEdit').onclick=()=>{S.edit=!S.edit;renderPlan()};$('btnLabels').onclick=()=>{S.labels=!S.labels;renderPlan();applyT()};
+  $('btnFit').onclick=fit;
+  const zc=f=>{const r=$('stage').getBoundingClientRect();zoomAt(r.width/2,r.height/2,T.k*f)};$('btnZin').onclick=()=>zc(1.4);$('btnZout').onclick=()=>zc(1/1.4);
+  $('upQ').oninput=renderUnplaced;
+  $('unplaced').onclick=e=>{const u=e.target.closest('.up');if(!u)return;if(isNarrow()||!S.canWrite){openItem(u.dataset.code);return}S.arm=S.arm===u.dataset.code?null:u.dataset.code;renderUnplaced();if(S.arm)toast('図面をクリックすると配置します')};
+  $('unplaced').ondblclick=e=>{const u=e.target.closest('.up');if(u)openItem(u.dataset.code)};
+  $('unplaced').ondragstart=e=>{const u=e.target.closest('.up');if(u)e.dataTransfer.setData('text/plain',u.dataset.code)};
+  const st=$('stage');
+  st.ondragover=e=>e.preventDefault();
+  st.ondrop=e=>{e.preventDefault();const code=e.dataTransfer.getData('text/plain');const pt=planPoint(e.clientX,e.clientY);if(code&&pt)placeItem(code,pt).catch(()=>{})};
+  st.addEventListener('wheel',e=>{e.preventDefault();const r=st.getBoundingClientRect();zoomAt(e.clientX-r.left,e.clientY-r.top,T.k*Math.exp(-e.deltaY*.0016))},{passive:false});
+  const P=new Map();let pan=null,pinch=null,drag=null,moved=false;
+  st.addEventListener('pointerdown',e=>{
+    if(e.target.closest('.stagebar,.empty'))return;
+    P.set(e.pointerId,{x:e.clientX,y:e.clientY});st.setPointerCapture(e.pointerId);moved=false;
+    const mk=e.target.closest('.mk');
+    if(P.size===1&&mk&&S.edit&&S.canWrite&&!S.pick){drag={code:mk.dataset.code,el:mk};return}
+    if(P.size===1)pan={x:e.clientX,y:e.clientY,tx:T.x,ty:T.y,mk:mk&&mk.dataset.code};
+    if(P.size===2){const [a,b]=[...P.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y)||1,k:T.k};pan=null;drag=null}
+  });
+  st.addEventListener('pointermove',e=>{if(!P.has(e.pointerId))return;P.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(drag){const f=curFloor();const pt=planPoint(e.clientX,e.clientY);if(pt){drag.el.style.left=pt.x*f.w+'px';drag.el.style.top=pt.y*f.h+'px';drag.pt=pt;moved=true}return}
+    if(pinch&&P.size===2){const [a,b]=[...P.values()];const r=st.getBoundingClientRect();zoomAt((a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top,pinch.k*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d);moved=true;return}
+    if(pan){const dx=e.clientX-pan.x,dy=e.clientY-pan.y;if(Math.abs(dx)+Math.abs(dy)>5)moved=true;if(moved){T.x=pan.tx+dx;T.y=pan.ty+dy;applyT()}}
+  });
+  const up=e=>{if(!P.has(e.pointerId))return;P.delete(e.pointerId);
+    if(drag){const d=drag;drag=null;if(moved&&d.pt)placeItem(d.code,d.pt).catch(()=>{});else openItem(d.code);return}
+    if(pinch){if(P.size<2)pinch=null;return}
+    if(pan&&!moved){const pt=planPoint(e.clientX,e.clientY);
+      if(S.pick){if(pt){if(S.pick.room){const rid=S.pick.room;
+          withRetry(()=>sb.from('rooms').update({floor_id:S.floorId,x:pt.x,y:pt.y,updated_at:nowIso()}).eq('id',rid).select().single()).then(r=>{const row=chk(r);S.rooms[row.id]=row;toast('部屋名を配置しました');endPick(null)}).catch(err=>toast(errMsg(err),4500))}
+        else endPick(pt)}}
+      else if(S.arm&&pt){const code=S.arm;placeItem(code,pt).then(()=>{const nx=unplacedList().find(i=>i.code!==code);S.arm=nx?nx.code:null;renderUnplaced()}).catch(()=>{})}
+      else if(pan.mk)openItem(pan.mk)}
+    pan=null};
+  st.addEventListener('pointerup',up);st.addEventListener('pointercancel',e=>{P.delete(e.pointerId);pan=pinch=drag=null});
+  addEventListener('resize',()=>{if(S.view==='plan'&&fitted)fit()});
+
+  $('lq').oninput=e=>{S.list.q=e.target.value;S.list.page=0;renderList()};
+  ['lfFloor','lfRoom','lfCat'].forEach((id,i)=>$(id).onchange=e=>{S.list[['floor','room','cat'][i]]=e.target.value;S.list.page=0;renderList()});
+  $('rows').onclick=e=>{const ck=e.target.closest('[data-chk]');if(ck){ck.checked?S.list.checked.add(ck.dataset.chk):S.list.checked.delete(ck.dataset.chk);updBulk();return}
+    if(e.target.id==='chkAll'){document.querySelectorAll('[data-chk]').forEach(c=>{c.checked=e.target.checked;e.target.checked?S.list.checked.add(c.dataset.chk):S.list.checked.delete(c.dataset.chk)});updBulk();return}
+    if(e.target.closest('.c-chk'))return;const r=e.target.closest('.row[data-code]');if(r)openItem(r.dataset.code)};
+  $('pager').onclick=e=>{const b=e.target.closest('[data-pg]');if(b){S.list.page+=+b.dataset.pg;renderList();$('v-list').scrollTop=0}};
+  $('bulkApply').onclick=bulkStatus;$('bulkClear').onclick=()=>{S.list.checked.clear();renderList()};
+  $('bulkQr').onclick=()=>openLabels([...S.list.checked].map(c=>S.items.get(c)).filter(Boolean));
+  $('sitesWrap').addEventListener('change',onSitesChange);$('sitesWrap').addEventListener('click',onSitesClick);
+  $('ioWrap').addEventListener('click',onIOClick);$('ioWrap').addEventListener('submit',onIOSubmit);$('ioWrap').addEventListener('change',onIOChange);
+  $('drawerHost').addEventListener('click',onDrawerClick);
+  const pf=(id,fn)=>$(id).onchange=e=>{const f=e.target.files[0];e.target.value='';fn(f)};
+  pf('fScan',onScanPhoto);pf('fPhoto',onPhoto);pf('fDraw',onDrawing);pf('fXlsx',onItemsFile);pf('fFac',onFacFile);
+  document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g){setView(g.dataset.go);return}
+    if(e.target.closest('[data-close]')){closeModal();return}
+    const ad=e.target.closest('[data-adddraw]');if(ad)addDrawing(ad.dataset.adddraw||null)});
+  addEventListener('keydown',e=>{if(e.key==='Escape'){if($('modalHost').innerHTML)closeModal();else if(S.pick)endPick(null);else if(S.arm){S.arm=null;renderUnplaced()}}});
+  addEventListener('hashchange',routeHash);
+}
+
+/* ---------- boot ---------- */
+async function boot(){
+  bindUI();
+  const c=cfg();if(!c.url||!c.key){showSetup();return}
+  if(!window.supabase){showSetup('接続ライブラリを読み込めませんでした。通信状態を確認して再読み込みしてください。');return}
+  try{sb=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}})}catch(e){showSetup('Project URL の形式が正しくありません。');return}
+  const m=location.hash.match(/^#i-([A-Za-z0-9-]+)$/);if(m)lsSet('fa.pending',m[1]);
+  sb.auth.onAuthStateChange((ev,session)=>{setTimeout(()=>{if(ev==='SIGNED_OUT'){S.email=null;showLogin(S.denyMsg)}else if(session)onSession(session)},0)});
+  const {data}=await sb.auth.getSession();
+  if(data.session)onSession(data.session);else showLogin();
+}
+boot();
+</script>
+</body>
+</html>

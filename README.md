@@ -1,1 +1,5 @@
-# asset-register
+# ファシリティ物品台帳
+
+拠点・部屋・フロア図面に物品を紐づけて管理するツールです（GitHub Pages ＋ Supabase）。
+
+© 合同会社mokume　無断複製・再配布禁止
